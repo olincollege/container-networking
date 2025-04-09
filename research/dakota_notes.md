@@ -43,7 +43,7 @@ Name spaces are like folders in a file system \- they let you separate your cont
 
 ### Actual Process
 
-`<<namespaces>>` \+=  
+```{shell} 
 	if ([socketpair](https://man7.org/linux/man-pages/man2/socketpair.2.html)(AF\_LOCAL, SOCK\_SEQPACKET, 0, sockets)) {  
 		fprintf(stderr, "socketpair failed: %m\\n");  
 		goto error;  
@@ -53,11 +53,12 @@ Name spaces are like folders in a file system \- they let you separate your cont
 		goto error;  
 	}  
 	config.fd \= sockets\[1\];
+```
 
 socketpair \- create a pair of connected sockets  
 fcntl \- manipulate file descriptor
 
-`<<namespaces>>` \+=  
+```{shell}
 	\#define STACK\_SIZE (1024 \* 1024\)
 
 	char \*stack \= 0;  
@@ -65,10 +66,11 @@ fcntl \- manipulate file descriptor
 		fprintf(stderr, "=\> malloc failed, out of memory?\\n");  
 		goto error;  
 	}
+```
 
 Assign temporary stack space for the namespace to store things in when cloning.
 
-`<<namespaces>>` \+=
+```{shell}
 
 	int flags \= CLONE\_NEWNS  
 		| CLONE\_NEWCGROUP  
@@ -76,13 +78,15 @@ Assign temporary stack space for the namespace to store things in when cloning.
 		| CLONE\_NEWIPC  
 		| CLONE\_NEWNET  
 		| CLONE\_NEWUTS;
+```
 
 Define which Linux namespaces you want the child process (i.e., the container) to be isolated into
 
-`<<namespaces>>` \+=  
+```{shell{
 	if ((child\_pid \= clone(child, stack \+ STACK\_SIZE, flags | SIGCHLD, \&config)) \== \-1) {  
 		fprintf(stderr, "=\> clone failed\! %m\\n");  
 		err \= 1;  
 		goto clear\_resources;  
-	}  
+	}
+``` 
 Clones it
