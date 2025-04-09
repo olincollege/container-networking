@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.22)
 
 # TODO: Define a good project in the line below. If applicable, list other
 # languages in this project managed by CMake.
-project(ProjectTitle
+project(Container-Networking
   VERSION 1.0
   LANGUAGES C
 )
@@ -19,6 +19,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wconversion")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wdouble-promotion")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wduplicated-branches")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wduplicated-cond")
+
 # The following line is only needed in LLVM/clang
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wimplicit-fallthrough")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wlogical-op")

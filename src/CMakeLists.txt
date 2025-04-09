@@ -8,3 +8,7 @@
 # or similar. The PRIVATE/INTERFACE/PUBLIC keyword will depend on whether the
 # library is used only in function bodies (PRIVATE), only in function
 # signatures/types (INTERFACE), or both (PUBLIC).
+
+add_executable(contained contained.c)
+target_link_libraries(contained PRIVATE seccomp)
+target_link_libraries(contained PRIVATE cap)
