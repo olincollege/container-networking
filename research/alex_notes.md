@@ -85,7 +85,8 @@ Additional files can be added
   - I believe it also reads from the parent the new uid/gid mappings
 - `mount` is used to attach (or mount) a file system to a specified directory<sup>5</sup>
 - cgroups have their own namespaces, as do mounts
-- 
+- We need to create the cgroup before we enter a cgroup namespace
+- Once we do, that cgroup will behave like the root cgroup inside of the namespace
 
 
 
