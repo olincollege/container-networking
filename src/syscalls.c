@@ -1,3 +1,5 @@
+#include "syscalls.h"
+
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
@@ -23,14 +25,14 @@
 #include <unistd.h>
 
 int pivot_root(const char* new_root, const char* put_old) {
-  return syscall(SYS_pivot_root, new_root, put_old);
+  return (int)syscall(SYS_pivot_root, new_root, put_old);
 }
 
 #define SCMP_FAIL SCMP_ACT_ERRNO(EPERM)
 
 int syscalls() {
   scmp_filter_ctx ctx = NULL;
-  fprintf(stderr, "=> filtering syscalls...");
+  (void)fprintf(stderr, "=> filtering syscalls...");
   if (!(ctx = seccomp_init(SCMP_ACT_ALLOW)) ||
       seccomp_rule_add(ctx, SCMP_FAIL, SCMP_SYS(chmod), 1,
                        SCMP_A1(SCMP_CMP_MASKED_EQ, S_ISUID, S_ISUID)) ||
@@ -63,17 +65,19 @@ int syscalls() {
       seccomp_rule_add(ctx, SCMP_FAIL, SCMP_SYS(userfaultfd), 0) ||
       seccomp_rule_add(ctx, SCMP_FAIL, SCMP_SYS(perf_event_open), 0) ||
       seccomp_attr_set(ctx, SCMP_FLTATR_CTL_NNP, 0) || seccomp_load(ctx)) {
-    if (ctx) seccomp_release(ctx);
-    fprintf(stderr, "failed: %m\n");
+    if (ctx) {
+      seccomp_release(ctx);
+    }
+    (void)fprintf(stderr, "failed: %m\n");
     return 1;
   }
   seccomp_release(ctx);
-  fprintf(stderr, "done.\n");
+  (void)fprintf(stderr, "done.\n");
   return 0;
 }
 
 int capabilities() {
-  fprintf(stderr, "=> dropping capabilities...");
+  (void)fprintf(stderr, "=> dropping capabilities...");
   int drop_caps[] = {
       CAP_AUDIT_CONTROL,   CAP_AUDIT_READ,   CAP_AUDIT_WRITE, CAP_BLOCK_SUSPEND,
       CAP_DAC_READ_SEARCH, CAP_FSETID,       CAP_IPC_LOCK,    CAP_MAC_ADMIN,
@@ -81,23 +85,26 @@ int capabilities() {
       CAP_SYS_ADMIN,       CAP_SYS_BOOT,     CAP_SYS_MODULE,  CAP_SYS_NICE,
       CAP_SYS_RAWIO,       CAP_SYS_RESOURCE, CAP_SYS_TIME,    CAP_WAKE_ALARM};
   size_t num_caps = sizeof(drop_caps) / sizeof(*drop_caps);
-  fprintf(stderr, "bounding...");
+  (void)fprintf(stderr, "bounding...");
   for (size_t i = 0; i < num_caps; i++) {
     if (prctl(PR_CAPBSET_DROP, drop_caps[i], 0, 0, 0)) {
-      fprintf(stderr, "prctl failed: %m\n");
+      (void)fprintf(stderr, "prctl failed: %m\n");
       return 1;
     }
   }
-  fprintf(stderr, "inheritable...");
+  (void)fprintf(stderr, "inheritable...");
   cap_t caps = NULL;
   if (!(caps = cap_get_proc()) ||
-      cap_set_flag(caps, CAP_INHERITABLE, num_caps, drop_caps, CAP_CLEAR) ||
+      cap_set_flag(caps, CAP_INHERITABLE, (int)num_caps, drop_caps,
+                   CAP_CLEAR) ||
       cap_set_proc(caps)) {
-    fprintf(stderr, "failed: %m\n");
-    if (caps) cap_free(caps);
+    (void)fprintf(stderr, "failed: %m\n");
+    if (caps) {
+        cap_free(caps);
+    }
     return 1;
   }
   cap_free(caps);
-  fprintf(stderr, "done.\n");
+  (void)fprintf(stderr, "done.\n");
   return 0;
 }
