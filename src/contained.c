@@ -447,7 +447,7 @@ finish_options:
     fprintf(stderr, "weird release format: %s\n", host.release);
     goto cleanup;
   }
-  if (major != 4 || (minor != 7 && minor != 8)) {
+  if (major != 6 || (minor != 8 && minor != 10)) {
     fprintf(stderr, "expected 4.7.x or 4.8.x: %s\n", host.release);
     goto cleanup;
   }
@@ -499,6 +499,9 @@ finish_options:
   }
 
   goto finish_child;
+
+
+  
 kill_and_finish_child:
   if (child_pid) kill(child_pid, SIGKILL);
 finish_child:;
