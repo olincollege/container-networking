@@ -1,3 +1,5 @@
+#include "cgroups.h"
+
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
@@ -23,19 +25,9 @@
 #include <unistd.h>
 
 
-#define MEMORY "1073741824"
-#define SHARES "256"
-#define PIDS "64"
-#define WEIGHT "10"
-#define FD_COUNT 64
 
-struct cgrp_control {
-  char control[256];
-  struct cgrp_setting {
-    char name[256];
-    char value[256];
-  } * *settings;
-};
+
+
 struct cgrp_setting add_to_tasks = {.name = "tasks", .value = "0"};
 
 struct cgrp_control* cgrps[] = {

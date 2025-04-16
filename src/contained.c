@@ -3,9 +3,9 @@
 /* This code is licensed under the GPLv3. You can find its text here:
    https://www.gnu.org/licenses/gpl-3.0.en.html */
 
-#include "cgroups.c"
-#include "syscalls.c"
-#include "utils.c"
+#include "cgroups.h"
+#include "syscalls.h"
+#include "utils.h"
 
 #define _GNU_SOURCE
 #include <errno.h>

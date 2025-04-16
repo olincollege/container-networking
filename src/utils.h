@@ -41,4 +41,4 @@ void usage();
 
 void cleanup();
 
-void error_and_exit();
+void error_and_exit(const char* error_msg);
