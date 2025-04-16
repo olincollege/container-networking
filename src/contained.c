@@ -195,7 +195,7 @@ typedef struct cgrp_control {
   cgrp_setting* settings[]; 
 } cgrp_control;
 
-// shread setting for all cgroups
+// shared setting for all cgroups
 const cgrp_setting add_to_tasks = {.name = "tasks", .value = "0"};
 
 // individual settings for cgroups 
@@ -208,28 +208,28 @@ const cgrp_setting pids_max        = { .name = "pids.max",                  .val
 const cgrp_setting blkio_weight    = { .name = "blkio.weight",              .value = PIDS };
 
 // define control groups with respective settings
-const cgrp_control memory_cgroup = {
+cgrp_control memory_cgroup = {
   .control = "memory",
   .settings = { &mem_limit, &kmem_limit, &add_to_tasks, NULL }
 };
 
-const cgrp_control cpu_cgroup = {
+cgrp_control cpu_cgroup = {
   .control = "cpu",
   .settings = { &cpu_shares, &add_to_tasks, NULL }
 };
 
-const cgrp_control pids_cgroup = {
+cgrp_control pids_cgroup = {
   .control = "pids",
   .settings = { &pids_max, &add_to_tasks, NULL }
 };
 
-const cgrp_control blkio_cgroup = {
+cgrp_control blkio_cgroup = {
   .control = "blkio",
   .settings = { &blkio_weight, &add_to_tasks, NULL }
 };
 
 // shouldn't be changed by the code later on
-const cgrp_control* const cgrps[] = {
+cgrp_control* cgrps[] = {
   &memory_cgroup,
   &cpu_cgroup,
   &pids_cgroup,
@@ -247,15 +247,16 @@ int resources(struct child_config* config) {
     // write formatted string into char array dir
     if (snprintf(dir, sizeof(dir), "/sys/fs/cgroup/%s/%s", (*cgrp)->control,
                 config->hostname) == -1) {
-                  error_and_exit("Failed to write directory name - too long?")
+                  error_and_exit("Failed to write directory name - too long?");
                   return -1;
     }
     // create folder with permissions
     // S_IRUSR - read permissions for owner
     // S_IRUSR - write permissions for owner
     // S_IXUSR - execute permissions for owner
+    // CURRENTLY ERRORING - MIGHT BE BECAUSE PARENT FOLDERS DO NOT EXIST
     if (mkdir(dir, S_IRUSR | S_IWUSR | S_IXUSR)) {
-      error_and_exit("mkdir failed")
+      error_and_exit("mkdir failed");
       return -1;
     }
     // for each setting associated with the current cgrp
@@ -308,17 +309,17 @@ int free_resources(struct child_config* config) {
                  config->hostname) == -1 ||
         snprintf(task, sizeof(task), "/sys/fs/cgroup/%s/tasks",
                  (*cgrp)->control) == -1) {
-      error_and_exit("snprintf failed")
+      error_and_exit("snprintf failed");
       return -1;
     }
     // originally used O_WRONLY flag
     if ((task_fd = open(task, O_CLOEXEC)) == -1) {
-      error_and_exit("Opening task file failed")
+      error_and_exit("Opening task file failed");
       return -1;
     }
     // empties tasks from the cgroup so we can remove the directory
     if (write(task_fd, "0", 2) == -1) {
-      error_and_exit("Writing to task file failed")
+      error_and_exit("Writing to task file failed");
       close(task_fd);
       return -1;
     }
@@ -333,31 +334,38 @@ int free_resources(struct child_config* config) {
   return 0;
 }
 
+// What exactly are these? - come back to it
 #define USERNS_OFFSET 10000
 #define USERNS_COUNT 2000
 
+// what is fd?
 int handle_child_uid_map(pid_t child_pid, int fd) {
   int uid_map = 0;
   int has_userns = -1;
   if (read(fd, &has_userns, sizeof(has_userns)) != sizeof(has_userns)) {
-    fprintf(stderr, "couldn't read from child!\n");
+    error_and_exit("couldn't read from child");
     return -1;
   }
   if (has_userns) {
     char path[PATH_MAX] = {0};
+    // iterate through uid_map and gid_map (file)
     for (char** file = (char*[]){"uid_map", "gid_map", 0}; *file; file++) {
+      // make path variable equal /proc/child_pid/file
       if (snprintf(path, sizeof(path), "/proc/%d/%s", child_pid, *file) >
           sizeof(path)) {
-        fprintf(stderr, "snprintf too big? %m\n");
+        error_and_exit("snprintf too big?");
         return -1;
       }
-      fprintf(stderr, "writing %s...", path);
-      if ((uid_map = open(path, O_WRONLY)) == -1) {
-        fprintf(stderr, "open failed: %m\n");
+      (void)fprintf(stderr, "writing %s...", path);
+      if ((uid_map = open(path, O_CLOEXEC)) == -1) {
+        error_and_exit("failed to open uid_map");
         return -1;
       }
+      // dprintf - print to file descriptor
+      // macros defined above
+      // does the offsetting between where the child thinks it is and where the parent has it
       if (dprintf(uid_map, "0 %d %d\n", USERNS_OFFSET, USERNS_COUNT) == -1) {
-        fprintf(stderr, "dprintf failed: %m\n");
+        error_and_exit("failed to print to uid_map file descriptor");
         close(uid_map);
         return -1;
       }
@@ -365,7 +373,7 @@ int handle_child_uid_map(pid_t child_pid, int fd) {
     }
   }
   if (write(fd, &(int){0}, sizeof(int)) != sizeof(int)) {
-    fprintf(stderr, "couldn't write: %m\n");
+    error_and_exit("couldn't write to file descriptor");
     return -1;
   }
   return 0;
@@ -486,7 +494,7 @@ finish_options:
     fprintf(stderr, "weird release format: %s\n", host.release);
     goto cleanup;
   }
-  if (major != 4 || (minor != 7 && minor != 8)) {
+  if (major != 6 || (minor != 7 && minor != 8)) {
     fprintf(stderr, "expected 4.7.x or 4.8.x: %s\n", host.release);
     goto cleanup;
   }
