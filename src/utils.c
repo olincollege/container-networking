@@ -26,6 +26,7 @@
 
 void error_and_exit(const char* error_msg) {
   perror(error_msg);
+  cleanup();
 
   // NOLINTNEXTLINE(concurrency-mt-unsafe)
   exit(EXIT_FAILURE);
@@ -35,13 +36,13 @@ void kill_and_finish_child(pid_t child_pid) {
   if (child_pid) {
     kill(child_pid, SIGKILL);
   }
-  error_and_exit("")
+  error_and_exit("");
 }
 
-void usage(char** argv) {
-  (void)fprintf(stderr, "Usage: %s -u -1 -m . -c /bin/sh ~\n", argv[0]);
-  error_and_exit("Incorrect usage");
-}
+// void usage(char** argv) {
+//   (void)fprintf(stderr, "Usage: %s -u -1 -m . -c /bin/sh ~\n", argv[0]);
+//   error_and_exit("Incorrect usage");
+// }
 
 void cleanup() {
   if (sockets[0]) close(sockets[0]);
@@ -62,36 +63,64 @@ int finish_child(pid_t child_pid) {
   err |= WEXITSTATUS(child_status);
 }
 
-int finish_options() {
-  if (!config.argc || config.mount_dir) {
-    usage();
+int finish_options(struct child_config* configptr) {
+  struct child_config config = *configptr;
+  if (!config.argc || !config.mount_dir) {
+    (void)fprintf(stderr, "Usage: %s -u -1 -m . -c /bin/sh ~\n", config.argv[0]);
+    error_and_exit("Incorrect usage");
   }
+
+  (void)fprintf(stderr, "=> validating Linux version...");
+  struct utsname host = {0};
+  if (uname(&host)) {
+    (void)fprintf(stderr, "failed: %m\n");
+    cleanup();
+  }
+
+  int major = -1;
+  int minor = -1;
+  if (sscanf(host.release, "%u.%u.", &major, &minor) != 2) {
+    (void)fprintf(stderr, "weird release format: %s\n", host.release);
+    cleanup();
+  }
+  if (major != 6 || (minor != 8 && minor != 10)) {
+    (void)fprintf(stderr, "expected 4.7.x or 4.8.x: %s\n", host.release);
+    cleanup();
+  }
+
+  if (strcmp("x86_64", host.machine)) {
+    (void)fprintf(stderr, "expected x86_64: %s\n", host.machine);
+    cleanup();
+  }
+  (void)fprintf(stderr, "%s on %s.\n", host.release, host.machine);
 }
 
-finish_options : if (!config.argc) goto usage;
-if (!config.mount_dir) goto usage;
+// finish_options : 
 
-fprintf(stderr, "=> validating Linux version...");
-struct utsname host = {0};
-if (uname(&host)) {
-  fprintf(stderr, "failed: %m\n");
-  goto cleanup;
-}
-int major = -1;
-int minor = -1;
-if (sscanf(host.release, "%u.%u.", &major, &minor) != 2) {
-  fprintf(stderr, "weird release format: %s\n", host.release);
-  goto cleanup;
-}
-if (major != 6 || (minor != 8 && minor != 10)) {
-  fprintf(stderr, "expected 4.7.x or 4.8.x: %s\n", host.release);
-  goto cleanup;
-}
-if (strcmp("x86_64", host.machine)) {
-  fprintf(stderr, "expected x86_64: %s\n", host.machine);
-  goto cleanup;
-}
-fprintf(stderr, "%s on %s.\n", host.release, host.machine);
+// if (!config.argc) goto usage;
+// if (!config.mount_dir) goto usage;
+
+// fprintf(stderr, "=> validating Linux version...");
+// struct utsname host = {0};
+// if (uname(&host)) {
+//   fprintf(stderr, "failed: %m\n");
+//   goto cleanup;
+// }
+// int major = -1;
+// int minor = -1;
+// if (sscanf(host.release, "%u.%u.", &major, &minor) != 2) {
+//   fprintf(stderr, "weird release format: %s\n", host.release);
+//   goto cleanup;
+// }
+// if (major != 6 || (minor != 8 && minor != 10)) {
+//   fprintf(stderr, "expected 4.7.x or 4.8.x: %s\n", host.release);
+//   goto cleanup;
+// }
+// if (strcmp("x86_64", host.machine)) {
+//   fprintf(stderr, "expected x86_64: %s\n", host.machine);
+//   goto cleanup;
+// }
+// fprintf(stderr, "%s on %s.\n", host.release, host.machine);
 
 char hostname[256] = {0};
 if (choose_hostname(hostname, sizeof(hostname))) goto error;
