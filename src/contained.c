@@ -27,6 +27,12 @@
 #include <time.h>
 #include <unistd.h>
 
+void error_and_exit(const char* error_msg) {
+  perror(error_msg);
+  // NOLINTNEXTLINE(concurrency-mt-unsafe)
+  exit(EXIT_FAILURE);
+}
+
 struct child_config {
   int argc;
   uid_t uid;
@@ -178,93 +184,124 @@ int syscalls() {
 #define WEIGHT "10"
 #define FD_COUNT 64
 
-struct cgrp_control {
-  char control[256];
-  struct cgrp_setting {
-    char name[256];
-    char value[256];
-  } * *settings;
-};
-struct cgrp_setting add_to_tasks = {.name = "tasks", .value = "0"};
+typedef struct cgrp_setting {
+  char* name;
+  char* value;
+} cgrp_setting;
 
-struct cgrp_control* cgrps[] = {
-    &(struct cgrp_control){
-        .control = "memory",
-        .settings =
-            (struct cgrp_setting*[]){
-                &(struct cgrp_setting){.name = "memory.limit_in_bytes",
-                                       .value = MEMORY},
-                &(struct cgrp_setting){.name = "memory.kmem.limit_in_bytes",
-                                       .value = MEMORY},
-                &add_to_tasks, NULL}},
-    &(struct cgrp_control){
-        .control = "cpu",
-        .settings =
-            (struct cgrp_setting*[]){
-                &(struct cgrp_setting){.name = "cpu.shares", .value = SHARES},
-                &add_to_tasks, NULL}},
-    &(struct cgrp_control){
-        .control = "pids",
-        .settings =
-            (struct cgrp_setting*[]){
-                &(struct cgrp_setting){.name = "pids.max", .value = PIDS},
-                &add_to_tasks, NULL}},
-    &(struct cgrp_control){
-        .control = "blkio",
-        .settings =
-            (struct cgrp_setting*[]){
-                &(struct cgrp_setting){.name = "blkio.weight", .value = PIDS},
-                &add_to_tasks, NULL}},
-    NULL};
+// represents a cgroup controller for things like memory and cpu
+typedef struct cgrp_control {
+  char* control;
+  cgrp_setting* settings[]; 
+} cgrp_control;
+
+// shared setting for all cgroups
+const cgrp_setting add_to_tasks = {.name = "tasks", .value = "0"};
+
+// individual settings for cgroups 
+// values are macros defined up above - come back to why these values later
+// settings will limit how much resources the container gets for these processes
+const cgrp_setting mem_limit       = { .name = "memory.limit_in_bytes",     .value = MEMORY };
+const cgrp_setting kmem_limit      = { .name = "memory.kmem.limit_in_bytes",.value = MEMORY };
+const cgrp_setting cpu_shares      = { .name = "cpu.shares",                .value = SHARES };
+const cgrp_setting pids_max        = { .name = "pids.max",                  .value = PIDS };
+const cgrp_setting blkio_weight    = { .name = "blkio.weight",              .value = PIDS };
+
+// define control groups with respective settings
+cgrp_control memory_cgroup = {
+  .control = "memory",
+  .settings = { &mem_limit, &kmem_limit, &add_to_tasks, NULL }
+};
+
+cgrp_control cpu_cgroup = {
+  .control = "cpu",
+  .settings = { &cpu_shares, &add_to_tasks, NULL }
+};
+
+cgrp_control pids_cgroup = {
+  .control = "pids",
+  .settings = { &pids_max, &add_to_tasks, NULL }
+};
+
+cgrp_control blkio_cgroup = {
+  .control = "blkio",
+  .settings = { &blkio_weight, &add_to_tasks, NULL }
+};
+
+// shouldn't be changed by the code later on
+cgrp_control* cgrps[] = {
+  &memory_cgroup,
+  &cpu_cgroup,
+  &pids_cgroup,
+  &blkio_cgroup,
+  NULL
+};
+
 int resources(struct child_config* config) {
-  fprintf(stderr, "=> setting cgroups...");
-  for (struct cgrp_control** cgrp = cgrps; *cgrp; cgrp++) {
+  (void)fprintf(stderr, "=> setting cgroups...");
+  // iterate through our cgroup controllers
+  // Create a cgroup directory for each controller under /sys/fs/cgroup/<controller>/<hostname>
+  for (cgrp_control** cgrp = cgrps; *cgrp; cgrp++) {
     char dir[PATH_MAX] = {0};
-    fprintf(stderr, "%s...", (*cgrp)->control);
+    (void)fprintf(stderr, "%s...", (*cgrp)->control);
+    // write formatted string into char array dir
     if (snprintf(dir, sizeof(dir), "/sys/fs/cgroup/%s/%s", (*cgrp)->control,
-                 config->hostname) == -1) {
-      return -1;
+                config->hostname) == -1) {
+                  error_and_exit("Failed to write directory name - too long?");
+                  return -1;
     }
+    // create folder with permissions
+    // S_IRUSR - read permissions for owner
+    // S_IRUSR - write permissions for owner
+    // S_IXUSR - execute permissions for owner
+    // CURRENTLY ERRORING - MIGHT BE BECAUSE PARENT FOLDERS DO NOT EXIST
     if (mkdir(dir, S_IRUSR | S_IWUSR | S_IXUSR)) {
-      fprintf(stderr, "mkdir %s failed: %m\n", dir);
+      error_and_exit("mkdir failed");
       return -1;
     }
-    for (struct cgrp_setting** setting = (*cgrp)->settings; *setting;
+    // for each setting associated with the current cgrp
+    for (cgrp_setting** setting = (*cgrp)->settings; *setting;
          setting++) {
       char path[PATH_MAX] = {0};
-      int fd = 0;
+      int file_des = 0;
       if (snprintf(path, sizeof(path), "%s/%s", dir, (*setting)->name) == -1) {
-        fprintf(stderr, "snprintf failed: %m\n");
+        error_and_exit("Failed to write settings file name  - too long?");
         return -1;
       }
-      if ((fd = open(path, O_WRONLY)) == -1) {
-        fprintf(stderr, "opening %s failed: %m\n", path);
+      // open settings file with write only flag (originally used O_WRONLY)
+      if ((file_des = open(path, O_CLOEXEC)) == -1) {
+        error_and_exit("opening settings file failed");
         return -1;
       }
-      if (write(fd, (*setting)->value, strlen((*setting)->value)) == -1) {
-        fprintf(stderr, "writing to %s failed: %m\n", path);
-        close(fd);
+      // write into new settings file
+      if (write(file_des, (*setting)->value, strlen((*setting)->value)) == -1) {
+        error_and_exit("writing to settings file failed");
+        close(file_des);
         return -1;
       }
-      close(fd);
+      close(file_des);
     }
   }
-  fprintf(stderr, "done.\n");
-  fprintf(stderr, "=> setting rlimit...");
+  (void)fprintf(stderr, "done.\n");
+  (void)fprintf(stderr, "=> setting rlimit...");
+  // setrlimit - set resource limits
+  // Each resource has an associated soft and hard limit, as  defined by the rlimit structure
+  // A container can only open FD_COUNT files/sockets at a time
   if (setrlimit(RLIMIT_NOFILE, &(struct rlimit){
-                                   .rlim_max = FD_COUNT,
-                                   .rlim_cur = FD_COUNT,
+                                   .rlim_max = FD_COUNT,  // limit the number of open file descriptors (hard limit)
+                                   .rlim_cur = FD_COUNT,  // limit the number of open file descriptors (hard limit)
                                })) {
-    fprintf(stderr, "failed: %m\n");
+    error_and_exit("Failed to set file limit");
     return 1;
   }
-  fprintf(stderr, "done.\n");
+  (void)fprintf(stderr, "done.\n");
   return 0;
 }
 
 int free_resources(struct child_config* config) {
-  fprintf(stderr, "=> cleaning cgroups...");
-  for (struct cgrp_control** cgrp = cgrps; *cgrp; cgrp++) {
+  (void)fprintf(stderr, "=> cleaning cgroups...");
+  // for each cgroup controller
+  for (cgrp_control** cgrp = cgrps; *cgrp; cgrp++) {
     char dir[PATH_MAX] = {0};
     char task[PATH_MAX] = {0};
     int task_fd = 0;
@@ -272,53 +309,63 @@ int free_resources(struct child_config* config) {
                  config->hostname) == -1 ||
         snprintf(task, sizeof(task), "/sys/fs/cgroup/%s/tasks",
                  (*cgrp)->control) == -1) {
-      fprintf(stderr, "snprintf failed: %m\n");
+      error_and_exit("snprintf failed");
       return -1;
     }
-    if ((task_fd = open(task, O_WRONLY)) == -1) {
-      fprintf(stderr, "opening %s failed: %m\n", task);
+    // originally used O_WRONLY flag
+    if ((task_fd = open(task, O_CLOEXEC)) == -1) {
+      error_and_exit("Opening task file failed");
       return -1;
     }
+    // empties tasks from the cgroup so we can remove the directory
     if (write(task_fd, "0", 2) == -1) {
-      fprintf(stderr, "writing to %s failed: %m\n", task);
+      error_and_exit("Writing to task file failed");
       close(task_fd);
       return -1;
     }
     close(task_fd);
+    // remove directory
     if (rmdir(dir)) {
-      fprintf(stderr, "rmdir %s failed: %m", dir);
+      error_and_exit("Failed to remove directory");
       return -1;
     }
   }
-  fprintf(stderr, "done.\n");
+  (void)fprintf(stderr, "done.\n");
   return 0;
 }
 
+// What exactly are these? - come back to it
 #define USERNS_OFFSET 10000
 #define USERNS_COUNT 2000
 
+// what is fd?
 int handle_child_uid_map(pid_t child_pid, int fd) {
   int uid_map = 0;
   int has_userns = -1;
   if (read(fd, &has_userns, sizeof(has_userns)) != sizeof(has_userns)) {
-    fprintf(stderr, "couldn't read from child!\n");
+    error_and_exit("couldn't read from child");
     return -1;
   }
   if (has_userns) {
     char path[PATH_MAX] = {0};
+    // iterate through uid_map and gid_map (file)
     for (char** file = (char*[]){"uid_map", "gid_map", 0}; *file; file++) {
+      // make path variable equal /proc/child_pid/file
       if (snprintf(path, sizeof(path), "/proc/%d/%s", child_pid, *file) >
           sizeof(path)) {
-        fprintf(stderr, "snprintf too big? %m\n");
+        error_and_exit("snprintf too big?");
         return -1;
       }
-      fprintf(stderr, "writing %s...", path);
-      if ((uid_map = open(path, O_WRONLY)) == -1) {
-        fprintf(stderr, "open failed: %m\n");
+      (void)fprintf(stderr, "writing %s...", path);
+      if ((uid_map = open(path, O_CLOEXEC)) == -1) {
+        error_and_exit("failed to open uid_map");
         return -1;
       }
+      // dprintf - print to file descriptor
+      // macros defined above
+      // does the offsetting between where the child thinks it is and where the parent has it
       if (dprintf(uid_map, "0 %d %d\n", USERNS_OFFSET, USERNS_COUNT) == -1) {
-        fprintf(stderr, "dprintf failed: %m\n");
+        error_and_exit("failed to print to uid_map file descriptor");
         close(uid_map);
         return -1;
       }
@@ -326,7 +373,7 @@ int handle_child_uid_map(pid_t child_pid, int fd) {
     }
   }
   if (write(fd, &(int){0}, sizeof(int)) != sizeof(int)) {
-    fprintf(stderr, "couldn't write: %m\n");
+    error_and_exit("couldn't write to file descriptor");
     return -1;
   }
   return 0;
@@ -447,7 +494,7 @@ finish_options:
     fprintf(stderr, "weird release format: %s\n", host.release);
     goto cleanup;
   }
-  if (major != 6 || (minor != 8 && minor != 10)) {
+  if (major != 6 || (minor != 7 && minor != 8)) {
     fprintf(stderr, "expected 4.7.x or 4.8.x: %s\n", host.release);
     goto cleanup;
   }
@@ -499,9 +546,6 @@ finish_options:
   }
 
   goto finish_child;
-
-
-  
 kill_and_finish_child:
   if (child_pid) kill(child_pid, SIGKILL);
 finish_child:;
