@@ -196,16 +196,16 @@ typedef struct cgrp_control {
 } cgrp_control;
 
 // shared setting for all cgroups
-const cgrp_setting add_to_tasks = {.name = "tasks", .value = "0"};
+cgrp_setting add_to_tasks = {.name = "tasks", .value = "0"};
 
 // individual settings for cgroups 
 // values are macros defined up above - come back to why these values later
 // settings will limit how much resources the container gets for these processes
-const cgrp_setting mem_limit       = { .name = "memory.limit_in_bytes",     .value = MEMORY };
-const cgrp_setting kmem_limit      = { .name = "memory.kmem.limit_in_bytes",.value = MEMORY };
-const cgrp_setting cpu_shares      = { .name = "cpu.shares",                .value = SHARES };
-const cgrp_setting pids_max        = { .name = "pids.max",                  .value = PIDS };
-const cgrp_setting blkio_weight    = { .name = "blkio.weight",              .value = PIDS };
+cgrp_setting mem_limit       = { .name = "memory.limit_in_bytes",     .value = MEMORY };
+cgrp_setting kmem_limit      = { .name = "memory.kmem.limit_in_bytes",.value = MEMORY };
+cgrp_setting cpu_shares      = { .name = "cpu.shares",                .value = SHARES };
+cgrp_setting pids_max        = { .name = "pids.max",                  .value = PIDS };
+cgrp_setting blkio_weight    = { .name = "blkio.weight",              .value = PIDS };
 
 // define control groups with respective settings
 cgrp_control memory_cgroup = {
