@@ -4,6 +4,8 @@
 #include <criterion/new/assert.h>
 #include <criterion/redirect.h>
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+
 Test(cgroups, file_existence) {
     struct child_config test_config = {
         .argc = 0,
@@ -17,6 +19,8 @@ Test(cgroups, file_existence) {
     char file_path[PATH_MAX] = {0};
     resources(&test_config);
     for (int i = 0; i < 4; i++) {
+        // assume if snprintf doesn't fail in resources(), it won't fail here
+        //NOLINTNEXTLINE
         (void)snprintf(file_path, sizeof(file_path), "/sys/fs/cgroup/test-container/%s", files[i]);
         cr_assert(eq(int, access(file_path, F_OK), 0));
     } 
@@ -38,6 +42,8 @@ Test(cgroups, file_values) {
     char file_path[PATH_MAX] = {0};
     resources(&test_config);
     for (int i = 0; i < 4; i++) {
+        // assume if snprintf doesn't fail in resources(), it won't fail here
+        //NOLINTNEXTLINE
         (void)snprintf(file_path, sizeof(file_path), "/sys/fs/cgroup/test-container/%s", files[i]);
         char value[64] = {0};
         int file_des = open(file_path, O_RDONLY | O_CLOEXEC);
@@ -47,3 +53,5 @@ Test(cgroups, file_values) {
     } 
     free_resources(&test_config);
 }
+
+// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

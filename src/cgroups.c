@@ -1,5 +1,6 @@
 #include "cgroups.h"
 
+const int pid_buf_size = 32;
 void error_and_exit(const char* error_msg) {
     perror(error_msg);
     // NOLINTNEXTLINE(concurrency-mt-unsafe)
@@ -15,6 +16,8 @@ int resources(struct child_config* config) {
 
     (void)fprintf(stderr, "=> creating cgroup directory...\n");
     char dir[PATH_MAX] = {0};
+    // removing snprintf warnings - error checking is done manually with error_and_exit
+    // NOLINTNEXTLINE
     if (snprintf(dir, sizeof(dir), "/sys/fs/cgroup/%s", config->hostname) == -1) {
         error_and_exit("Failed to write cgroup directory name - too long?");
     }
@@ -27,6 +30,7 @@ int resources(struct child_config* config) {
     // join current process to the new cgroup
     (void)fprintf(stderr, "=> creating process directory...\n");
     char procs_path[PATH_MAX];
+    // NOLINTNEXTLINE
     if (snprintf(procs_path, sizeof(procs_path), "%s/cgroup.procs", dir) == -1) {
         error_and_exit("Failed to write procs directory name - too long?");
     }
@@ -52,12 +56,13 @@ int resources(struct child_config* config) {
     // for each setting, write value to corresponding file
     for (cgrp_setting** set = settings; *set; set++) {
         char path[PATH_MAX];
+        // NOLINTNEXTLINE
         if (snprintf(path, sizeof(path), "%s/%s", dir, (*set)->name) == -1) {
-        error_and_exit("Failed to write settings file path - name too long?");
+            error_and_exit("Failed to write settings file path - name too long?");
         }
         int setting_fd = open(path, O_WRONLY | O_CLOEXEC);
         if (setting_fd < 0) {
-        error_and_exit("opening cgroup setting file failed");
+            error_and_exit("opening cgroup setting file failed");
         }
         if (write(setting_fd, (*set)->value, strlen((*set)->value)) == -1) {
             close(setting_fd);
@@ -72,6 +77,7 @@ int resources(struct child_config* config) {
 int free_resources(struct child_config* config) {
     char dir[PATH_MAX];
     (void)fprintf(stderr, "=> freeing cgroups...\n");
+    // NOLINTNEXTLINE
     if (snprintf(dir, sizeof(dir), "/sys/fs/cgroup/%s", config->hostname) == -1) {
         error_and_exit("Failed to write cgroup directory");
     }
@@ -82,9 +88,12 @@ int free_resources(struct child_config* config) {
     if (root_fd < 0) {
         error_and_exit("Failed to open root cgroup.procs");
     }
-    char pid_buf[32];
+    char pid_buf[pid_buf_size];
     // write current process out of container and into root cgroup
-    snprintf(pid_buf, sizeof(pid_buf), "%d", getpid());
+    // NOLINTNEXTLINE
+    if (snprintf(pid_buf, sizeof(pid_buf), "%d", getpid()) == -1) {
+        error_and_exit("Failed to write current process pid");
+    }
     if (write(root_fd, pid_buf, strlen(pid_buf)) == -1) {
         close(root_fd);
         error_and_exit("Failed to move process to root cgroup");

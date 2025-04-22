@@ -1,4 +1,5 @@
-#define _GNU_SOURCE
+//NOLINTNEXTLINE
+#define _GNU_SOURCE // needed for implementing system utilities
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/limits.h>
