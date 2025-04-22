@@ -12,3 +12,12 @@
 add_executable(contained contained.c)
 target_link_libraries(contained PRIVATE seccomp)
 target_link_libraries(contained PRIVATE cap)
+
+
+add_library(src
+    utils.c
+)
+
+target_include_directories(src
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+)
