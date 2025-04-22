@@ -34,6 +34,9 @@ int resources(struct child_config* config) {
     if (procs_fd < 0) {
         error_and_exit("Failed to open cgroup.procs");
     }
+    (void)fprintf(stderr, "PID joining cgroup: %d\n", getpid()); // DEBUGGING
+    // this puts the current process into this cgroup
+    // I think lizzie moves the process out of the cgroup at some point into her code (mounts), so we might want to do that
     dprintf(procs_fd, "%d", getpid());
     close(procs_fd);
 
@@ -56,7 +59,10 @@ int resources(struct child_config* config) {
         if (setting_fd < 0) {
         error_and_exit("opening cgroup setting file failed");
         }
-        write(setting_fd, (*set)->value, strlen((*set)->value));
+        if (write(setting_fd, (*set)->value, strlen((*set)->value)) == -1) {
+            close(setting_fd);
+            error_and_exit("Failed to write into settings file");
+        }
         close(setting_fd);
     }
     (void)fprintf(stderr, "=> finished creating cgroups...\n");
@@ -65,31 +71,30 @@ int resources(struct child_config* config) {
 
 int free_resources(struct child_config* config) {
     char dir[PATH_MAX];
-    char procs[PATH_MAX];
     (void)fprintf(stderr, "=> freeing cgroups...\n");
-    if (snprintf(dir, sizeof(dir), "/sys/fs/cgroup/%s", config->hostname) == -1 ||
-        snprintf(procs, sizeof(procs), "%s/cgroup.procs", dir) == -1) {
-        error_and_exit("Failed to write cgroup directory or procs path");
+    if (snprintf(dir, sizeof(dir), "/sys/fs/cgroup/%s", config->hostname) == -1) {
+        error_and_exit("Failed to write cgroup directory");
     }
 
-    (void)fprintf(stderr, "=> clean up cgroup.procs...\n");
-    // Move all processes out of the cgroup
-    int procs_fd = open(procs, O_WRONLY | O_CLOEXEC);
-    if (procs_fd < 0) {
-        error_and_exit("Failed to open cgroup.procs for cleanup");
+    (void)fprintf(stderr, "=> moving process out of cgroup...\n");
+    // Move process back to root cgroup
+    int root_fd = open("/sys/fs/cgroup/cgroup.procs", O_WRONLY | O_CLOEXEC);
+    if (root_fd < 0) {
+        error_and_exit("Failed to open root cgroup.procs");
     }
-    // writing 0 moves processes to root/parent directory
-    if (write(procs_fd, "0", 1) == -1) {
-        close(procs_fd);
-        error_and_exit("Failed to write '0' to cgroup.procs to remove processes");
+    char pid_buf[32];
+    // write current process out of container and into root cgroup
+    snprintf(pid_buf, sizeof(pid_buf), "%d", getpid());
+    if (write(root_fd, pid_buf, strlen(pid_buf)) == -1) {
+        close(root_fd);
+        error_and_exit("Failed to move process to root cgroup");
     }
-    close(procs_fd);
+    close(root_fd);
 
+    // Now it's safe to remove the cgroup
     (void)fprintf(stderr, "=> remove cgroup directory...\n");
-    // Now we can safely remove the cgroup directory
     if (rmdir(dir)) {
         error_and_exit("Failed to remove cgroup directory");
     }
-
     return 0;
-}  
+}

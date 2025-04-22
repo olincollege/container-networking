@@ -20,7 +20,7 @@ Test(cgroups, file_existence) {
         (void)snprintf(file_path, sizeof(file_path), "/sys/fs/cgroup/test-container/%s", files[i]);
         cr_assert(eq(int, access(file_path, F_OK), 0));
     } 
-    // free_resources(&test_config);
+    free_resources(&test_config);
 }
 
 Test(cgroups, file_values) {
@@ -34,7 +34,6 @@ Test(cgroups, file_values) {
     };
     const char* files[4] = {"memory.max", "cpu.max", "pids.max", "io.weight"};
     // defined by macros
-    // come back to this after free_resources is working - default in io might be because of that
     char* correct_vals[4] = {"1073741824\n", "100000 100000\n", "64\n", "default 10\n"};
     char file_path[PATH_MAX] = {0};
     resources(&test_config);
@@ -46,5 +45,5 @@ Test(cgroups, file_values) {
         close(file_des);
         cr_assert(eq(str, value, correct_vals[i]));
     } 
-    // free_resources(&test_config);
+    free_resources(&test_config);
 }
