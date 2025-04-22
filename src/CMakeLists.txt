@@ -12,3 +12,5 @@
 add_executable(contained contained.c)
 target_link_libraries(contained PRIVATE seccomp)
 target_link_libraries(contained PRIVATE cap)
+add_library(cgroups STATIC cgroups.c)
+target_include_directories(cgroups PUBLIC)

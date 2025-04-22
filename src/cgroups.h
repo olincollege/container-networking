@@ -3,6 +3,9 @@
 #include <fcntl.h>
 #include <linux/limits.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #define MEMORY "1073741824"   // 1GB
