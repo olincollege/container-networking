@@ -27,6 +27,12 @@
 #include <time.h>
 #include <unistd.h>
 
+void error_and_exit(const char* error_msg) {
+  perror(error_msg);
+  // NOLINTNEXTLINE(concurrency-mt-unsafe)
+  exit(EXIT_FAILURE);
+}
+
 struct child_config {
   int argc;
   uid_t uid;
@@ -71,58 +77,50 @@ int pivot_root(const char* new_root, const char* put_old) {
 }
 
 int mounts(struct child_config* config) {
-  fprintf(stderr, "=> remounting everything with MS_PRIVATE...");
+  (void)fprintf(stderr, "=> remounting everything with MS_PRIVATE...");
   if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL)) {
-    fprintf(stderr, "failed! %m\n");
-    return -1;
+    error_and_exit("failed!");
   }
-  fprintf(stderr, "remounted.\n");
+  (void)fprintf(stderr, "remounted.\n");
 
-  fprintf(stderr, "=> making a temp directory and a bind mount there...");
+  (void)fprintf(stderr, "=> making a temp directory and a bind mount there...");
   char mount_dir[] = "/tmp/tmp.XXXXXX";
   if (!mkdtemp(mount_dir)) {
-    fprintf(stderr, "failed making a directory!\n");
-    return -1;
+    error_and_exit("failed making a directory");
   }
 
   if (mount(config->mount_dir, mount_dir, NULL, MS_BIND | MS_PRIVATE, NULL)) {
-    fprintf(stderr, "bind mount failed!\n");
-    return -1;
+    error_and_exit("bind mount failed");
   }
 
   char inner_mount_dir[] = "/tmp/tmp.XXXXXX/oldroot.XXXXXX";
   memcpy(inner_mount_dir, mount_dir, sizeof(mount_dir) - 1);
   if (!mkdtemp(inner_mount_dir)) {
-    fprintf(stderr, "failed making the inner directory!\n");
-    return -1;
+    error_and_exit( "failed making the inner directory!");
   }
-  fprintf(stderr, "done.\n");
+  (void)fprintf(stderr, "done.\n");
 
-  fprintf(stderr, "=> pivoting root...");
+  (void)fprintf(stderr, "=> pivoting root...");
   if (pivot_root(mount_dir, inner_mount_dir)) {
-    fprintf(stderr, "failed!\n");
-    return -1;
+    error_and_exit("failed!");
   }
-  fprintf(stderr, "done.\n");
+  (void)fprintf(stderr, "done.\n");
 
   char* old_root_dir = basename(inner_mount_dir);
   char old_root[sizeof(inner_mount_dir) + 1] = {"/"};
   strcpy(&old_root[1], old_root_dir);
 
-  fprintf(stderr, "=> unmounting %s...", old_root);
+  (void)fprintf(stderr, "=> unmounting %s...", old_root);
   if (chdir("/")) {
-    fprintf(stderr, "chdir failed! %m\n");
-    return -1;
+    error_and_exit("chdir failed!");
   }
   if (umount2(old_root, MNT_DETACH)) {
-    fprintf(stderr, "umount failed! %m\n");
-    return -1;
+    error_and_exit("unmount failed!");
   }
   if (rmdir(old_root)) {
-    fprintf(stderr, "rmdir failed! %m\n");
-    return -1;
+    error_and_exit("rmdir failed");
   }
-  fprintf(stderr, "done.\n");
+  (void)fprintf(stderr, "done.\n");
   return 0;
 }
 
@@ -172,127 +170,98 @@ int syscalls() {
   return 0;
 }
 
-#define MEMORY "1073741824"
-#define SHARES "256"
+#define MEMORY "1073741824"   // 1GB
+#define CPU_MAX "100000 100000" // 100% of 1 core
 #define PIDS "64"
-#define WEIGHT "10"
-#define FD_COUNT 64
+#define IO_WEIGHT "10"
 
-struct cgrp_control {
-  char control[256];
-  struct cgrp_setting {
-    char name[256];
-    char value[256];
-  } * *settings;
-};
-struct cgrp_setting add_to_tasks = {.name = "tasks", .value = "0"};
+typedef struct cgrp_setting {
+  char* name;
+  char* value;
+} cgrp_setting;
 
-struct cgrp_control* cgrps[] = {
-    &(struct cgrp_control){
-        .control = "memory",
-        .settings =
-            (struct cgrp_setting*[]){
-                &(struct cgrp_setting){.name = "memory.limit_in_bytes",
-                                       .value = MEMORY},
-                &(struct cgrp_setting){.name = "memory.kmem.limit_in_bytes",
-                                       .value = MEMORY},
-                &add_to_tasks, NULL}},
-    &(struct cgrp_control){
-        .control = "cpu",
-        .settings =
-            (struct cgrp_setting*[]){
-                &(struct cgrp_setting){.name = "cpu.shares", .value = SHARES},
-                &add_to_tasks, NULL}},
-    &(struct cgrp_control){
-        .control = "pids",
-        .settings =
-            (struct cgrp_setting*[]){
-                &(struct cgrp_setting){.name = "pids.max", .value = PIDS},
-                &add_to_tasks, NULL}},
-    &(struct cgrp_control){
-        .control = "blkio",
-        .settings =
-            (struct cgrp_setting*[]){
-                &(struct cgrp_setting){.name = "blkio.weight", .value = PIDS},
-                &add_to_tasks, NULL}},
-    NULL};
+cgrp_setting mem_limit = { .name = "memory.max", .value = MEMORY };
+cgrp_setting cpu_limit = { .name = "cpu.max", .value = CPU_MAX };
+cgrp_setting pids_max  = { .name = "pids.max", .value = PIDS };
+cgrp_setting io_weight = { .name = "io.weight", .value = IO_WEIGHT };
+
 int resources(struct child_config* config) {
-  fprintf(stderr, "=> setting cgroups...");
-  for (struct cgrp_control** cgrp = cgrps; *cgrp; cgrp++) {
-    char dir[PATH_MAX] = {0};
-    fprintf(stderr, "%s...", (*cgrp)->control);
-    if (snprintf(dir, sizeof(dir), "/sys/fs/cgroup/%s/%s", (*cgrp)->control,
-                 config->hostname) == -1) {
-      return -1;
-    }
-    if (mkdir(dir, S_IRUSR | S_IWUSR | S_IXUSR)) {
-      fprintf(stderr, "mkdir %s failed: %m\n", dir);
-      return -1;
-    }
-    for (struct cgrp_setting** setting = (*cgrp)->settings; *setting;
-         setting++) {
-      char path[PATH_MAX] = {0};
-      int fd = 0;
-      if (snprintf(path, sizeof(path), "%s/%s", dir, (*setting)->name) == -1) {
-        fprintf(stderr, "snprintf failed: %m\n");
-        return -1;
-      }
-      if ((fd = open(path, O_WRONLY)) == -1) {
-        fprintf(stderr, "opening %s failed: %m\n", path);
-        return -1;
-      }
-      if (write(fd, (*setting)->value, strlen((*setting)->value)) == -1) {
-        fprintf(stderr, "writing to %s failed: %m\n", path);
-        close(fd);
-        return -1;
-      }
-      close(fd);
-    }
+  (void)fprintf(stderr, "=> creating cgroup directory...");
+  char dir[PATH_MAX] = {0};
+  if (snprintf(dir, sizeof(dir), "/sys/fs/cgroup/%s", config->hostname) == -1) {
+    error_and_exit("Failed to write cgroup directory name - too long?");
   }
-  fprintf(stderr, "done.\n");
-  fprintf(stderr, "=> setting rlimit...");
-  if (setrlimit(RLIMIT_NOFILE, &(struct rlimit){
-                                   .rlim_max = FD_COUNT,
-                                   .rlim_cur = FD_COUNT,
-                               })) {
-    fprintf(stderr, "failed: %m\n");
-    return 1;
+  // rwx for owner, r-x for groups and others
+  const mode_t perms = 0755;
+  if (mkdir(dir, perms) && errno != EEXIST) { // with fallback if it already exists
+    error_and_exit("mkdir failed");
+  } 
+
+  // join current process to the new cgroup
+  char procs_path[PATH_MAX];
+  if (snprintf(procs_path, sizeof(procs_path), "%s/cgroup.procs", dir) == -1) {
+    error_and_exit("Failed to write procs directory name - too long?");
   }
-  fprintf(stderr, "done.\n");
+  int procs_fd = open(procs_path, O_WRONLY | O_CLOEXEC);
+  if (procs_fd < 0) {
+    error_and_exit("Failed to open cgroup.procs");
+  }
+  dprintf(procs_fd, "%d", getpid());
+  close(procs_fd);
+
+  // Now write settings
+  cgrp_setting* settings[] = {
+    &mem_limit,
+    &cpu_limit,
+    &pids_max,
+    &io_weight,
+    NULL
+  };
+
+  for (cgrp_setting** set = settings; *set; set++) {
+    char path[PATH_MAX];
+    if (snprintf(path, sizeof(path), "%s/%s", dir, (*set)->name) == -1) {
+      error_and_exit("Failed to write settings file path - name too long?");
+    }
+    int setting_fd = open(path, O_WRONLY | O_CLOEXEC);
+    if (setting_fd < 0) {
+      error_and_exit("opening cgroup setting file failed");
+    }
+    write(setting_fd, (*set)->value, strlen((*set)->value));
+    close(setting_fd);
+  }
+
   return 0;
 }
 
 int free_resources(struct child_config* config) {
-  fprintf(stderr, "=> cleaning cgroups...");
-  for (struct cgrp_control** cgrp = cgrps; *cgrp; cgrp++) {
-    char dir[PATH_MAX] = {0};
-    char task[PATH_MAX] = {0};
-    int task_fd = 0;
-    if (snprintf(dir, sizeof(dir), "/sys/fs/cgroup/%s/%s", (*cgrp)->control,
-                 config->hostname) == -1 ||
-        snprintf(task, sizeof(task), "/sys/fs/cgroup/%s/tasks",
-                 (*cgrp)->control) == -1) {
-      fprintf(stderr, "snprintf failed: %m\n");
-      return -1;
-    }
-    if ((task_fd = open(task, O_WRONLY)) == -1) {
-      fprintf(stderr, "opening %s failed: %m\n", task);
-      return -1;
-    }
-    if (write(task_fd, "0", 2) == -1) {
-      fprintf(stderr, "writing to %s failed: %m\n", task);
-      close(task_fd);
-      return -1;
-    }
-    close(task_fd);
-    if (rmdir(dir)) {
-      fprintf(stderr, "rmdir %s failed: %m", dir);
-      return -1;
-    }
+  char dir[PATH_MAX];
+  char procs[PATH_MAX];
+
+  if (snprintf(dir, sizeof(dir), "/sys/fs/cgroup/%s", config->hostname) == -1 ||
+      snprintf(procs, sizeof(procs), "%s/cgroup.procs", dir) == -1) {
+    error_and_exit("Failed to write cgroup directory or procs path");
   }
-  fprintf(stderr, "done.\n");
+
+  // Move all processes out of the cgroup
+  int procs_fd = open(procs, O_WRONLY | O_CLOEXEC);
+  if (procs_fd < 0) {
+    error_and_exit("Failed to open cgroup.procs for cleanup");
+  }
+  // writing 0 moves processes to root/parent directory
+  if (write(procs_fd, "0", 1) == -1) {
+    close(procs_fd);
+    error_and_exit("Failed to write '0' to cgroup.procs to remove processes");
+  }
+  close(procs_fd);
+
+  // Now we can safely remove the cgroup directory
+  if (rmdir(dir)) {
+    error_and_exit("Failed to remove cgroup directory");
+  }
+
   return 0;
-}
+}  
 
 #define USERNS_OFFSET 10000
 #define USERNS_COUNT 2000
