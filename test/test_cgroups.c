@@ -54,4 +54,17 @@ Test(cgroups, file_values) {
     free_resources(&test_config);
 }
 
+Test(cgroups, remove_cgroup_dir) {
+    struct child_config test_config = {
+        .argc = 0,
+        .uid = 0,
+        .fd = 0,
+        .hostname = "test-container",
+        .argv = NULL,
+        .mount_dir = NULL
+    };
+    resources(&test_config);
+    free_resources(&test_config);
+    cr_assert(ne(int, access("/sys/fs/cgroup/test-container", F_OK), 0));
+}
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
