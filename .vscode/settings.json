@@ -1,6 +1,15 @@
 {
     "files.associations": {
         "sched.h": "c",
-        "capability.h": "c"
+        "capability.h": "c",
+        "redirect.h": "c",
+        "logging.h": "c",
+        "criterion.h": "c",
+        "system_error": "c",
+        "array": "c",
+        "functional": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "utility": "c"
     }
 }
