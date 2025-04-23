@@ -10,6 +10,13 @@
         "functional": "c",
         "tuple": "c",
         "type_traits": "c",
-        "utility": "c"
+        "utility": "c",
+        "cgroups.h": "c",
+        "seccomp.h": "c",
+        "syscall.h": "c",
+        "libgen.h": "c",
+        "stdlib.h": "c",
+        "limits.h": "c",
+        "string.h": "c"
     }
 }

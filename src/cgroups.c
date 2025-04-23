@@ -105,5 +105,60 @@ int free_resources(struct child_config* config) {
     if (rmdir(dir)) {
         error_and_exit("Failed to remove cgroup directory");
     }
+    (void)fprintf(stderr, "=> finished removing cgroup...\n");
+    return 0;
+}
+
+
+int mounts(struct child_config* config) {
+    (void)fprintf(stderr, "=> Making / MS_PRIVATE recursively...\n");
+    if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL) < 0) {
+        error_and_exit("mount MS_PRIVATE");
+    }
+
+    // Create a temporary mount point
+    char new_root_template[] = "/tmp/container_root.XXXXXX";
+    char* new_root = mkdtemp(new_root_template);
+    if (!new_root) {
+        error_and_exit("mkdtemp new_root");
+    }
+
+    // Bind mount the desired new root to this temp location
+    if (mount(config->mount_dir, new_root, NULL, MS_BIND, NULL) < 0) {
+        error_and_exit("bind mount config->mount_dir to new_root");
+    }
+
+    // Create a directory inside new_root for the old root to live during pivot_root
+    char old_root[PATH_MAX];
+    // disable lint because we manually error check
+    //NOLINTNEXTLINE
+    if(snprintf(old_root, sizeof(old_root), "%s/old_root", new_root) == -1) {
+        error_and_exit("couldn't write file name - too long?");
+    }
+    const mode_t perms = 0777;
+    if (mkdir(old_root, perms) < 0) {
+        error_and_exit("mkdir old_root inside new_root");
+    }
+
+    (void)fprintf(stderr, "=> pivot_root(%s, %s)...\n", new_root, old_root);
+    if (syscall(SYS_pivot_root, new_root, old_root) < 0) {
+        error_and_exit("pivot_root failed");
+    }
+
+    // Change to new root
+    if (chdir("/") < 0) {
+        error_and_exit("chdir to new root");
+    }
+
+    // Unmount and remove the old root
+    if (umount2("/old_root", MNT_DETACH) < 0) {
+        error_and_exit("umount2 old_root");
+    }
+
+    if (rmdir("/old_root") < 0) {
+        error_and_exit("rmdir old_root");
+    }
+
+    (void)fprintf(stderr, "=> Mount setup complete.\n");
     return 0;
 }
