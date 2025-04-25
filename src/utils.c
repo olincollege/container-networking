@@ -166,7 +166,7 @@ int userns(struct child_config* config) {
 }
 
 // function 5: child function executed in new namespaces
-def child(void* arg) {
+int child(void* arg) {
     struct child_config* config = arg;
 
     if (sethostname(config->hostname, strlen(config->hostname)) ||
