@@ -25,6 +25,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "error_handling.h"
+
 /**
  * Drop bounding and inheritable capabilities.
  *

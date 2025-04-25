@@ -29,3 +29,6 @@
 #include "syscalls.h"
 #include "utils.h"
 
+#define MAJOR_VERSION 6
+#define MINOR_VERSION 8
+

@@ -13,24 +13,28 @@ int capabilities() {
   (void)fprintf(stderr, "bounding...");
   for (size_t i = 0; i < num_caps; i++) {
     if (prctl(PR_CAPBSET_DROP, drop_caps[i], 0, 0, 0)) {
-      (void)fprintf(stderr, "prctl failed: %m\n");
-      return 1;
+      error_and_exit("prctl failed: ");
+      // (void)fprintf(stderr, "prctl failed: %s\n", strerror(errno));
+      // return 1;
     }
   }
   (void)fprintf(stderr, "inheritable...");
   cap_t caps = NULL;
   if (!(caps = cap_get_proc()) ||
-      cap_set_flag(caps, CAP_INHERITABLE, num_caps, drop_caps, CAP_CLEAR) ||
+      cap_set_flag(caps, CAP_INHERITABLE, (int)num_caps, drop_caps,
+                   CAP_CLEAR) ||
       cap_set_proc(caps)) {
-    (void)fprintf(stderr, "failed: %m\n");
-    if (caps) cap_free(caps);
-    return 1;
+    // (void)fprintf(stderr, "failed: %m\n");
+    if (caps) {
+      cap_free(caps);
+    }
+    error_and_exit("failed: ");
+    // return 1;
   }
   cap_free(caps);
   (void)fprintf(stderr, "done.\n");
   return 0;
 }
-
 
 #define SCMP_FAIL SCMP_ACT_ERRNO(EPERM)
 
@@ -69,8 +73,11 @@ int syscalls() {
       seccomp_rule_add(ctx, SCMP_FAIL, SCMP_SYS(userfaultfd), 0) ||
       seccomp_rule_add(ctx, SCMP_FAIL, SCMP_SYS(perf_event_open), 0) ||
       seccomp_attr_set(ctx, SCMP_FLTATR_CTL_NNP, 0) || seccomp_load(ctx)) {
-    if (ctx) seccomp_release(ctx);
-    (void)fprintf(stderr, "failed: %m\n");
+    if (ctx) {
+      seccomp_release(ctx);
+    }
+    // (void)fprintf(stderr, "failed: %m\n");
+    error_and_exit("failed: ");
     return 1;
   }
   seccomp_release(ctx);

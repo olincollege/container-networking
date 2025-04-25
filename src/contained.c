@@ -33,13 +33,18 @@ int main(int argc, char** argv) {
     last_optind = optind;
   }
 finish_options:
-  if (!config.argc) goto usage;
-  if (!config.mount_dir) goto usage;
+  if (!config.argc) {
+    goto usage;
+  }
+  if (!config.mount_dir) {
+    goto usage;
+  }
 
   (void)fprintf(stderr, "=> validating Linux version...");
   struct utsname host = {0};
   if (uname(&host)) {
-    (void)fprintf(stderr, "failed: %m\n");
+    // (void)fprintf(stderr, "failed: %m\n");
+    error_and_exit("failed: ");
     goto cleanup;
   }
   int major = -1;
@@ -48,7 +53,7 @@ finish_options:
     (void)fprintf(stderr, "weird release format: %s\n", host.release);
     goto cleanup;
   }
-  if (major != 6 || (minor != 7 && minor != 8)) {
+  if (major != MAJOR_VERSION || minor != MINOR_VERSION) {
     (void)fprintf(stderr, "expected 4.7.x or 4.8.x: %s\n", host.release);
     goto cleanup;
   }
@@ -63,11 +68,13 @@ finish_options:
   config.hostname = hostname;
 
   if (socketpair(AF_LOCAL, SOCK_SEQPACKET, 0, sockets)) {
-    (void)fprintf(stderr, "socketpair failed: %m\n");
+    // (void)fprintf(stderr, "socketpair failed: %m\n");
+    error_and_exit("socketpair failed:");
     goto error;
   }
   if (fcntl(sockets[0], F_SETFD, FD_CLOEXEC)) {
-    (void)fprintf(stderr, "fcntl failed: %m\n");
+    // (void)fprintf(stderr, "fcntl failed: %m\n");
+    error_and_exit("fcntl failed: ");
     goto error;
   }
   config.fd = sockets[1];
@@ -86,7 +93,8 @@ finish_options:
               CLONE_NEWNET | CLONE_NEWUTS;
   if ((child_pid =
            clone(child, stack + STACK_SIZE, flags | SIGCHLD, &config)) == -1) {
-    (void)fprintf(stderr, "=> clone failed! %m\n");
+    // (void)fprintf(stderr, "=> clone failed! %m\n");
+    error_and_exit("=> clone failed!");
     err = 1;
     goto clear_resources;
   }
@@ -101,7 +109,9 @@ finish_options:
 
   goto finish_child;
 kill_and_finish_child:
-  if (child_pid) kill(child_pid, SIGKILL);
+  if (child_pid) {
+    kill(child_pid, SIGKILL);
+  }
 finish_child:;
   int child_status = 0;
   waitpid(child_pid, &child_status, 0);
@@ -117,7 +127,11 @@ usage:
 error:
   err = 1;
 cleanup:
-  if (sockets[0]) close(sockets[0]);
-  if (sockets[1]) close(sockets[1]);
+  if (sockets[0]) {
+    close(sockets[0]);
+  }
+  if (sockets[1]) {
+    close(sockets[1]);
+  }
   return err;
 }

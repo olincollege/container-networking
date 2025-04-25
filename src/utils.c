@@ -35,10 +35,10 @@ int allocate_stack_and_clone(int sockets[2], struct child_config* config) {
   char* stack = NULL;
   pid_t child_pid = 0;
 
-  stack = malloc(STACK_SIZE);
+  stack = malloc((size_t)STACK_SIZE);
   if (!stack) {
-    fprintf(stderr, "=> malloc failed, out of memory?\n");
-    return -1;
+    error_and_exit("=> malloc failed, out of memory?");
+    // return -1;
   }
 
   if (resources(config)) {
@@ -51,9 +51,10 @@ int allocate_stack_and_clone(int sockets[2], struct child_config* config) {
 
   child_pid = clone(child, stack + STACK_SIZE, flags | SIGCHLD, config);
   if (child_pid == -1) {
-    fprintf(stderr, "=> clone failed! %m\n");
+    // (void)fprintf(stderr, "=> clone failed! %m\n");
     free(stack);
-    return -1;
+    error_and_exit("=> clone failed!");
+    // return -1;
   }
 
   close(sockets[1]);
@@ -68,8 +69,8 @@ int handle_child_uid_map(pid_t child_pid, int fd) {
   int uid_map = 0;
   int has_userns = -1;
   if (read(fd, &has_userns, sizeof(has_userns)) != sizeof(has_userns)) {
-    perror("couldn't read from child");
-    return -1;
+    error_and_exit("couldn't read from child");
+    // return -1;
   }
 
   if (has_userns) {
@@ -77,18 +78,18 @@ int handle_child_uid_map(pid_t child_pid, int fd) {
     for (char** file = (char*[]){"uid_map", "gid_map", 0}; *file; file++) {
       if (snprintf(path, sizeof(path), "/proc/%d/%s", child_pid, *file) >
           sizeof(path)) {
-        perror("snprintf too big?");
-        return -1;
+        error_and_exit("snprintf too big?");
+        // return -1;
       }
-      fprintf(stderr, "writing %s...\n", path);
+      (void)fprintf(stderr, "writing %s...\n", path);
       if ((uid_map = open(path, O_CLOEXEC)) == -1) {
-        perror("failed to open uid_map");
-        return -1;
+        error_and_exit("failed to open uid_map");
+        // return -1;
       }
       if (dprintf(uid_map, "0 %d %d\n", USERNS_OFFSET, USERNS_COUNT) == -1) {
-        perror("failed to write to uid_map");
         close(uid_map);
-        return -1;
+        error_and_exit("failed to write to uid_map");
+        // return -1;
       }
       close(uid_map);
     }
@@ -104,7 +105,7 @@ int handle_child_uid_map(pid_t child_pid, int fd) {
 
 // function 4: user namespace
 int userns(struct child_config* config) {
-  fprintf(stderr, "=> trying a user namespace...\n");
+  (void)fprintf(stderr, "=> trying a user namespace...\n");
   int has_userns = !unshare(CLONE_NEWUSER);
 
   if (write(config->fd, &has_userns, sizeof(has_userns)) !=
@@ -115,28 +116,28 @@ int userns(struct child_config* config) {
 
   int result = 0;
   if (read(config->fd, &result, sizeof(result)) != sizeof(result)) {
-    perror("couldn't read from parent");
-    return -1;
+    error_and_exit("couldn't read from parent");
+    // return -1;
   }
 
   if (result) return -1;
 
   if (has_userns) {
-    fprintf(stderr, "done.\n");
+    (void)fprintf(stderr, "done.\n");
   } else {
-    fprintf(stderr, "unsupported? continuing.\n");
+    (void)fprintf(stderr, "unsupported? continuing.\n");
   }
 
-  fprintf(stderr, "=> switching to uid %d / gid %d...\n", config->uid,
+  (void)fprintf(stderr, "=> switching to uid %d / gid %d...\n", config->uid,
           config->uid);
   if (setgroups(1, &(gid_t){config->uid}) ||
       setresgid(config->uid, config->uid, config->uid) ||
       setresuid(config->uid, config->uid, config->uid)) {
-    perror("switch failed");
-    return -1;
+    error_and_exit("switch failed");
+    // return -1;
   }
 
-  fprintf(stderr, "done.\n");
+  (void)fprintf(stderr, "done.\n");
   return 0;
 }
 
@@ -147,7 +148,7 @@ int child(void* arg) {
   if (sethostname(config->hostname, strlen(config->hostname)) ||
       mounts(config) || userns(config) || capabilities() || syscalls()) {
     close(config->fd);
-    return -1;
+    error_and_exit("child failed");
   }
 
   close(config->fd);
