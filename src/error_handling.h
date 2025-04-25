@@ -1,6 +1,7 @@
-#pragma once
-
+//NOLINTNEXTLINE
 #define _GNU_SOURCE
+
+#pragma once
 
 #include <errno.h>
 #include <fcntl.h>
