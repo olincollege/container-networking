@@ -1,8 +1,10 @@
 //NOLINTNEXTLINE
 #define _GNU_SOURCE
+#pragma once
+#include "error_handling.h"
+
 #include <errno.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <fcntl.h>
@@ -14,8 +16,6 @@
 #include <unistd.h>
 
 #include <linux/limits.h>
-
-#include "utils.h"
 
 #define MEMORY "1073741824"   // 1GB
 #define CPU_MAX "100000 100000" // 100% of 1 core

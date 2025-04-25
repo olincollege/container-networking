@@ -11,15 +11,6 @@
 #define USERNS_OFFSET 10000
 #define USERNS_COUNT 2000
 
-struct child_config {
-    int argc;
-    uid_t uid;
-    int fd;
-    char* hostname;
-    char** argv;
-    char* mount_dir;
-};
-
 /**
  * Choose host name and initialize socketpair and fcntl.
  *
@@ -62,10 +53,3 @@ int userns(struct child_config* config);
  * @return 0 on success, -1 on failure.
  */
 int child(void* arg);
-
-/**
- * Print error message and exit.
- *
- * @param error_msg The message to display before exiting.
- */
-void error_and_exit(const char* error_msg);
