@@ -48,15 +48,6 @@ set(CRITERION_FLAGS --verbose -j1)
 add_subdirectory(test)
 
 
-# Add the test_utils executable
-add_executable(test_utils ${CMAKE_SOURCE_DIR}/test/test_utils.c) 
-
-target_link_libraries(test_utils
-    PRIVATE
-        src           
-        ${CRITERION}
-)
-
 # Link flags for mocking read/write (used by --wrap)
 set_target_properties(test_utils PROPERTIES
     LINK_FLAGS "-Wl,--wrap=write --wrap=read"

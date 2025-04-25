@@ -1,5 +1,7 @@
-// #include <criterion/criterion.h>
-// #include <criterion/logging.h>
+#include <criterion/criterion.h>
+#include <criterion/logging.h>
+#include <criterion/new/assert.h>
+#include <criterion/redirect.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -15,8 +17,7 @@ Test(utils, choose_hostname_format_and_length) {
 }
 
 int write_uid_gid_map(pid_t child_pid, const char* file, int uid, int count) {
-  cr_log_info("Mock write_uid_gid_map for PID %d, file %s\n", child_pid,
-              file);
+  cr_log_info("Mock write_uid_gid_map for PID %d, file %s\n", child_pid, file);
   cr_expect_str_one_of(file, (const char*[]){"uid_map", "gid_map"});
   cr_expect_eq(uid, 1000);
   cr_expect_eq(count, 1);

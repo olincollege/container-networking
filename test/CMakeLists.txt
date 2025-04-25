@@ -8,15 +8,13 @@ list(APPEND CMAKE_CTEST_ARGUMENTS --verbose)
 # If you need to test a library called foo, use lines like the following.
 # add_executable(test_foo test_foo.c)
 # target_link_libraries(test_foo
-#     PRIVATE foo
-#     PUBLIC ${CRITERION}
+# PRIVATE foo
+# PUBLIC ${CRITERION}
 # )
 # add_test(
-#     NAME test_foo
-#     COMMAND test_foo ${CRITERION_FLAGS}
+# NAME test_foo
+# COMMAND test_foo ${CRITERION_FLAGS}
 # )
-
-
 add_executable(test_cgroups test_cgroups.c)
 target_link_libraries(test_cgroups
     PRIVATE cgroups
@@ -25,4 +23,14 @@ target_link_libraries(test_cgroups
 add_test(
     NAME test_cgroups
     COMMAND test_cgroups ${CRITERION_FLAGS}
+)
+
+add_executable(test_utils test_utils.c)
+target_link_libraries(test_utils
+    PRIVATE utils
+    PUBLIC ${CRITERION}
+)
+add_test(
+    NAME test_utils
+    COMMAND test_utils ${CRITERION_FLAGS}
 )
