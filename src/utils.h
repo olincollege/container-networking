@@ -1,11 +1,24 @@
+#define _GNU_SOURCE
 #pragma once
-
+#include "cgroups.h"  // for resources()
+#include <sys/socket.h>
+#include <sys/mman.h>
 #include <sys/types.h>
-#include <unistd.h>
+#include <sys/wait.h>
+#include <fcntl.h>
 #include <sched.h>
+#include <unistd.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <time.h>
+
+// might not need?
+#include <grp.h>
+#include <linux/capability.h>
+#include <linux/limits.h>
+#include <pwd.h>
+#include <seccomp.h>
 
 #define STACK_SIZE (1024 * 1024)
 #define USERNS_OFFSET 10000

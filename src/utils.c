@@ -1,34 +1,6 @@
 
-#define _GNU_SOURCE
-// #todo fix the dependencies
-#include <grp.h>
-#include <linux/capability.h>
-#include <linux/limits.h>
-#include <pwd.h>
-#include <sched.h>
-#include <seccomp.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
-
-// things we def need
-// #define _GNU_SOURCE
 #include "utils.h"
-#include "cgroups.h"  // for resources()
-#include <sys/socket.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <fcntl.h>
-#include <sched.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <errno.h>
-#include <time.h>
+
 
 // function 1: choose host name and initialize socketpair and fcntl
 int choose_hostname(char* buff, size_t len) {
