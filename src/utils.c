@@ -1,3 +1,5 @@
+
+#define _GNU_SOURCE
 // #todo fix the dependencies
 #include <grp.h>
 #include <linux/capability.h>
@@ -12,7 +14,7 @@
 #include <unistd.h>
 
 // things we def need
-#define _GNU_SOURCE
+// #define _GNU_SOURCE
 #include "utils.h"
 #include "cgroups.h"  // for resources()
 #include <sys/socket.h>

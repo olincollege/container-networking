@@ -1,6 +1,29 @@
 #pragma once
 
+#define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <grp.h>
+#include <linux/capability.h>
+#include <linux/limits.h>
+#include <pwd.h>
+#include <sched.h>
+#include <seccomp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/capability.h>
+#include <sys/mount.h>
+#include <sys/prctl.h>
+#include <sys/resource.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
 
 /**
  * Drop bounding and inheritable capabilities.
@@ -16,11 +39,3 @@ int capabilities(void);
  */
 int syscalls(void);
 
-/**
- * Pivot the root filesystem using the pivot_root syscall.
- *
- * @param new_root Path to the new root.
- * @param put_old Path to directory to place the old root.
- * @return 0 on success, or -1 on failure.
- */
-int pivot_root(const char* new_root, const char* put_old);
