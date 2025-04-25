@@ -1,142 +1,164 @@
 #include "cgroups.h"
-#include <fcntl.h>
-#include <limits.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/resource.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
-// from: alex's code - lines 264–285
-const cgrp_setting add_to_tasks = {.name = "tasks", .value = "0"};
+const int pid_buf_size = 32;
+void error_and_exit(const char* error_msg) {
+    perror(error_msg);
+    // NOLINTNEXTLINE(concurrency-mt-unsafe)
+    exit(EXIT_FAILURE);
+  }
 
-const cgrp_setting mem_limit    = { .name = "memory.limit_in_bytes",      .value = MEMORY };
-const cgrp_setting kmem_limit   = { .name = "memory.kmem.limit_in_bytes", .value = MEMORY };
-const cgrp_setting cpu_shares   = { .name = "cpu.shares",                 .value = SHARES };
-const cgrp_setting pids_max     = { .name = "pids.max",                   .value = PIDS };
-const cgrp_setting blkio_weight = { .name = "blkio.weight",               .value = PIDS };
-
-cgrp_control memory_cgroup = {
-    .control = "memory",
-    .settings = { &mem_limit, &kmem_limit, &add_to_tasks, NULL }
-};
-
-cgrp_control cpu_cgroup = {
-    .control = "cpu",
-    .settings = { &cpu_shares, &add_to_tasks, NULL }
-};
-
-cgrp_control pids_cgroup = {
-    .control = "pids",
-    .settings = { &pids_max, &add_to_tasks, NULL }
-};
-
-cgrp_control blkio_cgroup = {
-    .control = "blkio",
-    .settings = { &blkio_weight, &add_to_tasks, NULL }
-};
-
-cgrp_control* cgrps[] = {
-    &memory_cgroup,
-    &cpu_cgroup,
-    &pids_cgroup,
-    &blkio_cgroup,
-    NULL
-};
-
-// from: function resources(struct child_config* config) — lines 287–323
 int resources(struct child_config* config) {
-    fprintf(stderr, "=> setting cgroups...\n");
+    // create relevant settings
+    cgrp_setting mem_limit = { .name = "memory.max", .value = MEMORY };
+    cgrp_setting cpu_limit = { .name = "cpu.max", .value = CPU_MAX };
+    cgrp_setting pids_max  = { .name = "pids.max", .value = PIDS };
+    cgrp_setting io_weight = { .name = "io.weight", .value = IO_WEIGHT };
 
-    for (cgrp_control** cgrp = cgrps; *cgrp; cgrp++) {
-        char dir[PATH_MAX] = {0};
-        fprintf(stderr, "%s...", (*cgrp)->control);
+    (void)fprintf(stderr, "=> creating cgroup directory...\n");
+    char dir[PATH_MAX] = {0};
+    // removing snprintf warnings - error checking is done manually with error_and_exit
+    // NOLINTNEXTLINE
+    if (snprintf(dir, sizeof(dir), "/sys/fs/cgroup/%s", config->hostname) == -1) {
+        error_and_exit("Failed to write cgroup directory name - too long?");
+    }
+    // rwx for owner, r-x for groups and others
+    const mode_t perms = 0755;
+    if (mkdir(dir, perms) && errno != EEXIST) { // make directory - doesn't error if it already exists
+        error_and_exit("mkdir failed");
+    } 
 
-        if (snprintf(dir, sizeof(dir), "/sys/fs/cgroup/%s/%s", (*cgrp)->control,
-                     config->hostname) == -1) {
-            error_and_exit("Failed to write directory name - too long?");
-            return -1;
+    // join current process to the new cgroup
+    (void)fprintf(stderr, "=> creating process directory...\n");
+    char procs_path[PATH_MAX];
+    // NOLINTNEXTLINE
+    if (snprintf(procs_path, sizeof(procs_path), "%s/cgroup.procs", dir) == -1) {
+        error_and_exit("Failed to write procs directory name - too long?");
+    }
+    int procs_fd = open(procs_path, O_WRONLY | O_CLOEXEC);
+    if (procs_fd < 0) {
+        error_and_exit("Failed to open cgroup.procs");
+    }
+    (void)fprintf(stderr, "PID joining cgroup: %d\n", getpid()); // DEBUGGING
+    // this puts the current process into this cgroup
+    // I think lizzie moves the process out of the cgroup at some point into her code (mounts), so we might want to do that
+    dprintf(procs_fd, "%d", getpid());
+    close(procs_fd);
+
+    (void)fprintf(stderr, "=> creating setting files...\n");
+    cgrp_setting* settings[] = {
+        &mem_limit,
+        &cpu_limit,
+        &pids_max,
+        &io_weight,
+        NULL
+    };
+
+    // for each setting, write value to corresponding file
+    for (cgrp_setting** set = settings; *set; set++) {
+        char path[PATH_MAX];
+        // NOLINTNEXTLINE
+        if (snprintf(path, sizeof(path), "%s/%s", dir, (*set)->name) == -1) {
+            error_and_exit("Failed to write settings file path - name too long?");
         }
-
-        if (mkdir(dir, S_IRUSR | S_IWUSR | S_IXUSR)) {
-            error_and_exit("mkdir failed");
-            return -1;
+        int setting_fd = open(path, O_WRONLY | O_CLOEXEC);
+        if (setting_fd < 0) {
+            error_and_exit("opening cgroup setting file failed");
         }
-
-        for (cgrp_setting** setting = (*cgrp)->settings; *setting; setting++) {
-            char path[PATH_MAX] = {0};
-            int file_des = 0;
-
-            if (snprintf(path, sizeof(path), "%s/%s", dir, (*setting)->name) == -1) {
-                error_and_exit("Failed to write settings file name - too long?");
-                return -1;
-            }
-
-            if ((file_des = open(path, O_CLOEXEC)) == -1) {
-                error_and_exit("opening settings file failed");
-                return -1;
-            }
-
-            if (write(file_des, (*setting)->value, strlen((*setting)->value)) == -1) {
-                error_and_exit("writing to settings file failed");
-                close(file_des);
-                return -1;
-            }
-            close(file_des);
+        if (write(setting_fd, (*set)->value, strlen((*set)->value)) == -1) {
+            close(setting_fd);
+            error_and_exit("Failed to write into settings file");
         }
+        close(setting_fd);
+    }
+    (void)fprintf(stderr, "=> finished creating cgroups...\n");
+    return 0;
+}
+
+int free_resources(struct child_config* config) {
+    char dir[PATH_MAX];
+    (void)fprintf(stderr, "=> freeing cgroups...\n");
+    // NOLINTNEXTLINE
+    if (snprintf(dir, sizeof(dir), "/sys/fs/cgroup/%s", config->hostname) == -1) {
+        error_and_exit("Failed to write cgroup directory");
     }
 
-    fprintf(stderr, "done.\n");
-    fprintf(stderr, "=> setting rlimit...");
-
-    if (setrlimit(RLIMIT_NOFILE, &(struct rlimit){
-        .rlim_max = FD_COUNT,
-        .rlim_cur = FD_COUNT })) {
-        error_and_exit("Failed to set file limit");
-        return 1;
+    (void)fprintf(stderr, "=> moving process out of cgroup...\n");
+    // Move process back to root cgroup
+    int root_fd = open("/sys/fs/cgroup/cgroup.procs", O_WRONLY | O_CLOEXEC);
+    if (root_fd < 0) {
+        error_and_exit("Failed to open root cgroup.procs");
     }
+    char pid_buf[pid_buf_size];
+    // write current process out of container and into root cgroup
+    // NOLINTNEXTLINE
+    if (snprintf(pid_buf, sizeof(pid_buf), "%d", getpid()) == -1) {
+        error_and_exit("Failed to write current process pid");
+    }
+    if (write(root_fd, pid_buf, strlen(pid_buf)) == -1) {
+        close(root_fd);
+        error_and_exit("Failed to move process to root cgroup");
+    }
+    close(root_fd);
 
-    fprintf(stderr, "done.\n");
+    // Now it's safe to remove the cgroup
+    (void)fprintf(stderr, "=> remove cgroup directory...\n");
+    if (rmdir(dir)) {
+        error_and_exit("Failed to remove cgroup directory");
+    }
+    (void)fprintf(stderr, "=> finished removing cgroup...\n");
     return 0;
 }
 
 
-// from: function free_resources(struct child_config* config) — lines 325–349
-int free_resources(struct child_config* config) {
-    fprintf(stderr, "=> cleaning cgroups...\n");
-
-    for (cgrp_control** cgrp = cgrps; *cgrp; cgrp++) {
-        char dir[PATH_MAX] = {0};
-        char task[PATH_MAX] = {0};
-        int task_fd = 0;
-
-        if (snprintf(dir, sizeof(dir), "/sys/fs/cgroup/%s/%s", (*cgrp)->control,
-                     config->hostname) == -1 ||
-            snprintf(task, sizeof(task), "/sys/fs/cgroup/%s/tasks", (*cgrp)->control) == -1) {
-            error_and_exit("snprintf failed");
-            return -1;
-        }
-
-        if ((task_fd = open(task, O_CLOEXEC)) == -1) {
-            error_and_exit("Opening task file failed");
-            return -1;
-        }
-
-        if (write(task_fd, "0", 2) == -1) {
-            error_and_exit("Writing to task file failed");
-            close(task_fd);
-            return -1;
-        }
-
-        close(task_fd);
-
-        if (rmdir(dir)) {
-            error_and_exit("Failed to remove directory");
-            return -1;
-        }
+int mounts(struct child_config* config) {
+    (void)fprintf(stderr, "=> Making / MS_PRIVATE recursively...\n");
+    if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL) < 0) {
+        error_and_exit("mount MS_PRIVATE");
     }
 
-    fprintf(stderr, "done.\n");
+    // Create a temporary mount point
+    char new_root_template[] = "/tmp/container_root.XXXXXX";
+    char* new_root = mkdtemp(new_root_template);
+    if (!new_root) {
+        error_and_exit("mkdtemp new_root");
+    }
+
+    // Bind mount the desired new root to this temp location
+    if (mount(config->mount_dir, new_root, NULL, MS_BIND, NULL) < 0) {
+        error_and_exit("bind mount config->mount_dir to new_root");
+    }
+
+    // Create a directory inside new_root for the old root to live during pivot_root
+    char old_root[PATH_MAX];
+    // disable lint because we manually error check
+    //NOLINTNEXTLINE
+    if(snprintf(old_root, sizeof(old_root), "%s/old_root", new_root) == -1) {
+        error_and_exit("couldn't write file name - too long?");
+    }
+    const mode_t perms = 0777;
+    if (mkdir(old_root, perms) < 0) {
+        error_and_exit("mkdir old_root inside new_root");
+    }
+
+    (void)fprintf(stderr, "=> pivot_root(%s, %s)...\n", new_root, old_root);
+    if (syscall(SYS_pivot_root, new_root, old_root) < 0) {
+        error_and_exit("pivot_root failed");
+    }
+
+    // Change to new root
+    if (chdir("/") < 0) {
+        error_and_exit("chdir to new root");
+    }
+
+    // Unmount and remove the old root
+    if (umount2("/old_root", MNT_DETACH) < 0) {
+        error_and_exit("umount2 old_root");
+    }
+
+    if (rmdir("/old_root") < 0) {
+        error_and_exit("rmdir old_root");
+    }
+
+    (void)fprintf(stderr, "=> Mount setup complete.\n");
     return 0;
 }

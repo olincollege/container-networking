@@ -1,60 +1,63 @@
-#pragma once
+//NOLINTNEXTLINE
+#define _GNU_SOURCE
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include "utils.h"
+#include <fcntl.h>
+#include <libgen.h>
+#include <sched.h>
+#include <sys/mount.h>
+#include <sys/stat.h>
+#include <sys/syscall.h> 
+#include <unistd.h>
 
-#define MEMORY "1073741824"
-#define SHARES "256"
+#include <linux/limits.h>
+
+#define MEMORY "1073741824"   // 1GB
+#define CPU_MAX "100000 100000" // 100% of 1 core
 #define PIDS "64"
-#define WEIGHT "10"
-#define FD_COUNT 64
+#define IO_WEIGHT "10"
 
-// From alex's code lines 187-213
-
-/**
- * Represents a single cgroup setting (name-value pair).
- */
+// a struct for the different settings/procs in a cgroup
 typedef struct cgrp_setting {
-  char* name;
-  char* value;
-} cgrp_setting;
+    char* name;
+    char* value;
+  } cgrp_setting;
+
+// shouldn't be here but will be for now
+  struct child_config {
+    int argc;
+    uid_t uid;
+    int fd;
+    char* hostname;
+    char** argv;
+    char* mount_dir;
+  };
 
 /**
- * Represents a cgroup controller (e.g., memory, cpu) with its settings.
- */
-typedef struct cgrp_control {
-  char* control;
-  cgrp_setting* settings[];
-} cgrp_control;
-
-// --- EXTERNAL CONSTANTS ---
-
-extern const cgrp_setting add_to_tasks;
-extern const cgrp_setting mem_limit;
-extern const cgrp_setting kmem_limit;
-extern const cgrp_setting cpu_shares;
-extern const cgrp_setting pids_max;
-extern const cgrp_setting blkio_weight;
-
-extern cgrp_control memory_cgroup;
-extern cgrp_control cpu_cgroup;
-extern cgrp_control pids_cgroup;
-extern cgrp_control blkio_cgroup;
-extern cgrp_control* cgrps[];
-
-// functions
-
-/**
- * Set up resource cgroups and file descriptor limits.
+ * Create cgroup file directories with appropriate settings
  *
- * @param config Pointer to a child_config struct.
- * @return 0 on success, 1 on failure.
+ * @param config The configuration/values this container will have
+ * @return 0 on success, exits on failure.
  */
 int resources(struct child_config* config);
 
 /**
- * Clean up and remove all created cgroup directories.
+ * Safely delete the container made for the given child configuration
  *
- * @param config Pointer to a child_config struct.
- * @return 0 on success, -1 on failure.
+ * @param config The configuration/values this container will have
+ * @return 0 on success, exits on failure.
  */
 int free_resources(struct child_config* config);
+
+/**
+ * Bind the mount directory in config and make it the new root directory of 
+ * the container
+ * 
+ * @param config Pointer to a struct containing the path to the desired new 
+ * root and other container info
+ * @return 0 on success, exits on failure.
+ */
+int mounts(struct child_config* config);
