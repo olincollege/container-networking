@@ -1,10 +1,9 @@
-/* -*- compile-command: "gcc -Wall -Werror -lcap -lseccomp contained.c -o
- * contained" -*- */
+/* Compile it with CMake!
+ * sudo ./build/src/contained -u -1 -m . -c /bin/sh ~ */
 /* This code is licensed under the GPLv3. You can find its text here:
    https://www.gnu.org/licenses/gpl-3.0.en.html */
 
 #include "contained.h"
-
 
 int main(int argc, char** argv) {
   struct child_config config = {0};
