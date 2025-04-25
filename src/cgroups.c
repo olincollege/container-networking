@@ -1,11 +1,6 @@
 #include "cgroups.h"
 
 const int pid_buf_size = 32;
-void error_and_exit(const char* error_msg) {
-    perror(error_msg);
-    // NOLINTNEXTLINE(concurrency-mt-unsafe)
-    exit(EXIT_FAILURE);
-  }
 
 int resources(struct child_config* config) {
     // create relevant settings

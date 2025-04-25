@@ -21,3 +21,5 @@ add_library(src
 target_include_directories(src
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
 )
+add_library(cgroups STATIC cgroups.c)
+target_include_directories(cgroups PUBLIC)

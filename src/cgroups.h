@@ -15,6 +15,8 @@
 
 #include <linux/limits.h>
 
+#include "utils.h"
+
 #define MEMORY "1073741824"   // 1GB
 #define CPU_MAX "100000 100000" // 100% of 1 core
 #define PIDS "64"
@@ -25,16 +27,6 @@ typedef struct cgrp_setting {
     char* name;
     char* value;
   } cgrp_setting;
-
-// shouldn't be here but will be for now
-  struct child_config {
-    int argc;
-    uid_t uid;
-    int fd;
-    char* hostname;
-    char** argv;
-    char* mount_dir;
-  };
 
 /**
  * Create cgroup file directories with appropriate settings
