@@ -12,8 +12,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "cgroups.h"  // for resources()
-#include "syscalls.h"
+#include "cgroups.h"   // for resources()
+#include "syscalls.h"  // for syscalls() and capabilities()
 
 // might not need?
 #include <grp.h>
