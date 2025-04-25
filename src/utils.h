@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #pragma once
 #include "cgroups.h"  // for resources()
+#include "syscalls.h"  // for syscalls() and capabilities()
 #include <sys/socket.h>
 #include <sys/mman.h>
 #include <sys/types.h>
