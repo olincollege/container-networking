@@ -15,7 +15,7 @@ add_library(cgroups cgroups.c cgroups.h)
 target_link_libraries(cgroups PRIVATE error_handling)
 
 add_library(utils utils.c utils.h)
-target_link_libraries(utils PRIVATE cgroups)
+target_link_libraries(utils PRIVATE cgroups syscalls)
 
 add_library(syscalls syscalls.c syscalls.h)
 target_link_libraries(syscalls PRIVATE seccomp cap)
