@@ -82,11 +82,18 @@ int handle_child_uid_map(pid_t child_pid, int fd) {
         // return -1;
       }
       (void)fprintf(stderr, "writing %s...\n", path);
-      if ((uid_map = open(path, O_CLOEXEC)) == -1) {
+      uid_map = open(path, O_WRONLY | O_CLOEXEC);
+      if (uid_map < 0) {
         error_and_exit("failed to open uid_map");
         // return -1;
       }
-      if (dprintf(uid_map, "0 %d %d\n", USERNS_OFFSET, USERNS_COUNT) == -1) {
+      char uid_map_val[PATH_MAX] = {0};
+      // removing snprintf warnings - error checking is done manually with error_and_exit
+      // NOLINTNEXTLINE
+      if (snprintf(uid_map_val, sizeof(uid_map_val), "0 %d %d\n", USERNS_OFFSET, USERNS_COUNT) == -1) {
+        error_and_exit("Failed to uid map value - too long?");
+    }
+      if (write(uid_map, uid_map_val, strlen(uid_map_val)) == -1) {
         close(uid_map);
         error_and_exit("failed to write to uid_map");
         // return -1;
