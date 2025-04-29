@@ -1,4 +1,5 @@
-#define _GNU_SOURCE
+// NOLINTNEXTLINE
+#define _GNU_SOURCE // necessary for system level stuff
 #pragma once
 #include <errno.h>
 #include <fcntl.h>
@@ -22,7 +23,7 @@
 #include <pwd.h>
 #include <seccomp.h>
 
-#define STACK_SIZE (1024 * 1024)
+#define STACK_SIZE ((size_t)(1024 * 1024))
 #define USERNS_OFFSET 10000
 #define USERNS_COUNT 2000
 

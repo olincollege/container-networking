@@ -1,5 +1,5 @@
 /* Compile it with CMake!
- * sudo ./build/src/contained -u -1 -m . -c /bin/sh ~ */
+ * sudo ./build/src/contained -u 1000 -m . -c /bin/sh ~ */
 /* This code is licensed under the GPLv3. You can find its text here:
    https://www.gnu.org/licenses/gpl-3.0.en.html */
 
