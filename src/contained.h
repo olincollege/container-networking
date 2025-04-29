@@ -32,3 +32,12 @@
 #define MAJOR_VERSION 6
 #define MINOR_VERSION 8
 
+void cleanup(int status, void* arg);
+
+void finish_child(int child_pid, int* err);
+
+void clear_resources(struct child_config* config, char* stack);
+
+void usage(char* path);
+
+int main(int argc, char** argv);
