@@ -30,6 +30,10 @@ target_link_libraries(test_utils
     PRIVATE utils
     PUBLIC ${CRITERION}
 )
+target_link_options(test_utils
+    PRIVATE
+    "-Wl,--wrap=open,--wrap=dprintf,--wrap=write,--wrap=read"
+)
 add_test(
     NAME test_utils
     COMMAND test_utils ${CRITERION_FLAGS}

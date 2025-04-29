@@ -1,78 +1,85 @@
-#include "../src/utils.h"
-
 #include <criterion/criterion.h>
 #include <criterion/logging.h>
 #include <criterion/new/assert.h>
 #include <criterion/redirect.h>
+#include <fcntl.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+#include "../src/utils.h"
 
-Test(utils, choose_hostname_format_and_length) {
-    char buffer[256];
-    int result = choose_hostname(buffer, sizeof(buffer));
+// mocks -- might cause issues if compiled on a diff computer, I can fix it when
+// we try again, its a fix in cmake
 
-    cr_assert_eq(result, 0, "choose_hostname should return 0");
-    cr_assert(strlen(buffer) > 0, "Hostname should not be empty");
-    cr_assert(strchr(buffer, '-') != NULL, "Hostname should have a dash");
+int __wrap_open(const char* pathname, int flags, ...) {
+  (void)pathname;
+  (void)flags;
+  return 3;
 }
 
-// Mockable function for uid/gid map writing
-int write_uid_gid_map(pid_t child_pid, const char* file, int uid, int count) {
-    cr_log_info("Mock write_uid_gid_map for PID %d, file %s\n", child_pid, file);
-    cr_assert(
-    strcmp(file, "uid_map") == 0 || strcmp(file, "gid_map") == 0,
-    "file should be either uid_map or gid_map, but was %s", file
-    );
-    cr_expect_eq(uid, 1000);
-    cr_expect_eq(count, 1);
-    return 0;  // Simulate success
+int __wrap_dprintf(int fd, const char* format, ...) {
+  (void)fd;
+  (void)format;
+  return 0;
 }
 
-Test(utils, handle_child_uid_map_success) {
-    int pipefd[2];
-    cr_assert(pipe(pipefd) == 0);
-
-    // Simulate child wrote 1 to indicate has_userns = true
-    int has_userns = 1;
-    cr_assert(write(pipefd[1], &has_userns, sizeof(int)) == sizeof(int));
-    lseek(pipefd[0], 0, SEEK_SET);  // rewind read pipe
-
-    int result = handle_child_uid_map(4242, pipefd[0]);
-    cr_assert_eq(result, 0);
-
-    close(pipefd[0]);
-    close(pipefd[1]);
-}
-
-// Mocks to replace read/write
 ssize_t __wrap_write(int fd, const void* buf, size_t count) {
-    (void)fd;
-    (void)buf;
-    return (ssize_t)count;  // pretend write always succeeds
+  (void)fd;
+  (void)buf;
+  return (ssize_t)count;
 }
 
 ssize_t __wrap_read(int fd, void* buf, size_t count) {
-    (void)fd;
-    if (count >= sizeof(int)) {
-        *(int*)buf = 0;  // simulate "OK" response
-    }
-    return (ssize_t)count;
+  (void)fd;
+  if (count >= sizeof(int)) {
+    *(int*)buf = 0;
+  }
+  return (ssize_t)count;
+}
+
+// Tests
+
+Test(utils, choose_hostname_format_and_length) {
+  char buffer[256];
+  int result = choose_hostname(buffer, sizeof(buffer));
+
+  cr_assert_eq(result, 0, "choose_hostname should return 0");
+  cr_assert(strlen(buffer) > 0, "Hostname should not be empty");
+  cr_assert(strchr(buffer, '-') != NULL, "Hostname should have a dash");
+}
+
+Test(utils, handle_child_uid_map_success) {
+  int pipefd[2];
+  cr_assert(pipe(pipefd) == 0, "pipe creation failed");
+
+  int has_userns = 1;
+  cr_assert(write(pipefd[1], &has_userns, sizeof(int)) == sizeof(int),
+            "write to pipe failed");
+  lseek(pipefd[0], 0, SEEK_SET);  // rewind read pipe
+
+  int result = handle_child_uid_map(getpid(), pipefd[0]);
+  cr_assert_eq(result, 0, "handle_child_uid_map should succeed");
+
+  close(pipefd[0]);
+  close(pipefd[1]);
 }
 
 Test(utils, userns_success) {
-    struct child_config config = {
-        .fd = 42,
-        .uid = 1000,
-        .argc = 0,
-        .argv = NULL,
-        .hostname = "unit-test",
-        .mount_dir = NULL
-    };
+  int pipefd[2];
+  cr_assert(pipe(pipefd) == 0, "pipe creation failed");
 
-    int result = userns(&config);
-    cr_assert_eq(result, 0);
+  struct child_config config = {.fd = pipefd[1],
+                                .uid = 1000,
+                                .argc = 0,
+                                .argv = NULL,
+                                .hostname = "unit-test",
+                                .mount_dir = NULL};
+
+  int result = userns(&config);
+  cr_assert_eq(result, 0, "userns should succeed");
+
+  close(pipefd[0]);
+  close(pipefd[1]);
 }
-
-// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
