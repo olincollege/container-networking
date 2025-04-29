@@ -3,6 +3,7 @@
 
 // function 1: choose host name and initialize socketpair and fcntl
 int choose_hostname(char* buff, size_t len) {
+  static const size_t num_cards = 78;
   static const char* suits[] = {"swords", "wands", "pentacles", "cups"};
   static const char* minor[] = {"ace",  "two",    "three", "four", "five",
                                 "six",  "seven",  "eight", "nine", "ten",
@@ -16,15 +17,21 @@ int choose_hostname(char* buff, size_t len) {
 
   struct timespec now = {0};
   clock_gettime(CLOCK_MONOTONIC, &now);
-  size_t ix = now.tv_nsec % 78;
+  size_t card_index = (size_t) now.tv_nsec % num_cards;
 
-  if (ix < sizeof(major) / sizeof(*major)) {
-    snprintf(buff, len, "%05lx-%s", now.tv_sec, major[ix]);
+  if (card_index < sizeof(major) / sizeof(*major)) {
+    // removing snprintf warnings - error checking is done manually with error_and_exit
+    // NOLINTNEXTLINE
+    if (snprintf(buff, len, "%05lx-%s", now.tv_sec, major[card_index]) == -1) {
+        error_and_exit("snprintf too big?");
+    }
+    // snprintf(buff, len, "%05lx-%s", now.tv_sec, major[card_index]);
   } else {
-    ix -= sizeof(major) / sizeof(*major);
-    snprintf(buff, len, "%05lxc-%s-of-%s", now.tv_sec,
-             minor[ix % (sizeof(minor) / sizeof(*minor))],
-             suits[ix / (sizeof(minor) / sizeof(*minor))]);
+    card_index -= sizeof(major) / sizeof(*major);
+    // NOLINTNEXTLINE
+    if (snprintf(buff, len, "%05lxc-%s-of-%s", now.tv_sec, minor[card_index % (sizeof(minor) / sizeof(*minor))], suits[card_index / (sizeof(minor) / sizeof(*minor))]) == -1) {
+      error_and_exit("snprintf too big?");
+    }
   }
 
   return 0;
@@ -35,7 +42,7 @@ int allocate_stack_and_clone(int sockets[2], struct child_config* config) {
   char* stack = NULL;
   pid_t child_pid = 0;
 
-  stack = malloc((size_t)STACK_SIZE);
+  stack = malloc(STACK_SIZE);
   if (!stack) {
     error_and_exit("=> malloc failed, out of memory?");
     // return -1;
@@ -46,10 +53,13 @@ int allocate_stack_and_clone(int sockets[2], struct child_config* config) {
     return -1;
   }
 
+  // int flags = CLONE_NEWNS | CLONE_NEWCGROUP | CLONE_NEWPID | CLONE_NEWIPC |
+  //             CLONE_NEWNET | CLONE_NEWUTS;
   int flags = CLONE_NEWNS | CLONE_NEWCGROUP | CLONE_NEWPID | CLONE_NEWIPC |
-              CLONE_NEWNET | CLONE_NEWUTS;
+              CLONE_NEWNET | CLONE_NEWUTS | SIGCHLD;
 
-  child_pid = clone(child, stack + STACK_SIZE, flags | SIGCHLD, config);
+  // child_pid = clone(child, stack + STACK_SIZE, flags | SIGCHLD, (void*)config);
+  child_pid = clone(child, stack + STACK_SIZE, flags, (void*)config);
   if (child_pid == -1) {
     // (void)fprintf(stderr, "=> clone failed! %m\n");
     free(stack);
@@ -65,10 +75,12 @@ int allocate_stack_and_clone(int sockets[2], struct child_config* config) {
 }
 
 // function 3: handle child uid map
-int handle_child_uid_map(pid_t child_pid, int fd) {
+// parameters are separate
+// NOLINTNEXTLINE
+int handle_child_uid_map(pid_t child_pid, int socket) {
   int uid_map = 0;
   int has_userns = -1;
-  if (read(fd, &has_userns, sizeof(has_userns)) != sizeof(has_userns)) {
+  if (read(socket, &has_userns, sizeof(has_userns)) != sizeof(has_userns)) {
     error_and_exit("couldn't read from child");
     // return -1;
   }
@@ -76,6 +88,7 @@ int handle_child_uid_map(pid_t child_pid, int fd) {
   if (has_userns) {
     char path[PATH_MAX] = {0};
     for (char** file = (char*[]){"uid_map", "gid_map", 0}; *file; file++) {
+      //NOLINTNEXTLINE
       if (snprintf(path, sizeof(path), "/proc/%d/%s", child_pid, *file) >
           sizeof(path)) {
         error_and_exit("snprintf too big?");
@@ -102,7 +115,7 @@ int handle_child_uid_map(pid_t child_pid, int fd) {
     }
   }
 
-  if (write(fd, &(int){0}, sizeof(int)) != sizeof(int)) {
+  if (write(socket, &(int){0}, sizeof(int)) != sizeof(int)) {
     perror("couldn't write to child");
     return -1;
   }
@@ -127,7 +140,9 @@ int userns(struct child_config* config) {
     // return -1;
   }
 
-  if (result) return -1;
+  if (result) {
+    return -1;
+  }
 
   if (has_userns) {
     (void)fprintf(stderr, "done.\n");
