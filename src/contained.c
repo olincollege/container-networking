@@ -134,6 +134,7 @@ finish_options:
            clone(child, stack + STACK_SIZE, flags, (void*)&config)) == -1) {
     clear_resources(&config, stack);
     error_and_exit("=> clone failed!");
+    return EXIT_FAILURE;  // resolves compiler warnings for some reason?
   }
   close(sockets[1]);
   sockets[1] = 0;
