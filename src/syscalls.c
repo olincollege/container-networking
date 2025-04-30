@@ -13,9 +13,8 @@ int capabilities() {
   (void)fprintf(stderr, "bounding...");
   for (size_t i = 0; i < num_caps; i++) {
     if (prctl(PR_CAPBSET_DROP, drop_caps[i], 0, 0, 0)) {
-      error_and_exit("prctl failed: ");
-      // (void)fprintf(stderr, "prctl failed: %s\n", strerror(errno));
-      // return 1;
+      perror("prctl failed: ");
+      return 1;
     }
   }
   (void)fprintf(stderr, "inheritable...");
@@ -24,12 +23,11 @@ int capabilities() {
       cap_set_flag(caps, CAP_INHERITABLE, (int)num_caps, drop_caps,
                    CAP_CLEAR) ||
       cap_set_proc(caps)) {
-    // (void)fprintf(stderr, "failed: %m\n");
+    perror("failed: ");
     if (caps) {
       cap_free(caps);
     }
-    error_and_exit("failed: ");
-    // return 1;
+    return 1;
   }
   cap_free(caps);
   (void)fprintf(stderr, "done.\n");
@@ -76,8 +74,7 @@ int syscalls() {
     if (ctx) {
       seccomp_release(ctx);
     }
-    // (void)fprintf(stderr, "failed: %m\n");
-    error_and_exit("failed: ");
+    perror("failed: ");
     return 1;
   }
   seccomp_release(ctx);

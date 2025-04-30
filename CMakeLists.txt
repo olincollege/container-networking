@@ -48,10 +48,3 @@ set(CRITERION_FLAGS --verbose -j1)
 add_subdirectory(test)
 
 
-# # Link flags for mocking read/write (used by --wrap)
-# set_target_properties(test_utils PROPERTIES
-#     LINK_FLAGS "-Wl,--wrap=write --wrap=read"
-# )
-
-# Register this test with CTest
-add_test(NAME test_utils COMMAND test_utils ${CRITERION_FLAGS})

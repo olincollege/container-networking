@@ -131,11 +131,9 @@ finish_options:
   int flags = CLONE_NEWNS | CLONE_NEWCGROUP | CLONE_NEWPID | CLONE_NEWIPC |
               CLONE_NEWNET | CLONE_NEWUTS | SIGCHLD;
   if ((child_pid =
-           clone(child, stack + STACK_SIZE, flags, &config)) == -1) {
-    error_and_exit("=> clone failed!");
+           clone(child, stack + STACK_SIZE, flags, (void*)&config)) == -1) {
     clear_resources(&config, stack);
-    // NOLINTNEXTLINE(concurrency-mt-unsafe)
-    exit(EXIT_FAILURE);
+    error_and_exit("=> clone failed!");
   }
   close(sockets[1]);
   sockets[1] = 0;
@@ -155,31 +153,4 @@ finish_options:
   clear_resources(&config, stack);
   // NOLINTNEXTLINE(concurrency-mt-unsafe)
   exit((int)err);
-  // kill_and_finish_child:
-  // if (child_pid) {
-  //   kill(child_pid, SIGKILL);
-  // }
-  // finish_child:
-  //   int child_status = 0;
-  //   waitpid(child_pid, &child_status, 0);
-  //   // free(child_pid);
-  //   err |= WEXITSTATUS(child_status);
-  // clear_resources:
-  //   free_resources(&config);
-  //   free(stack);
-
-  //   goto cleanup;
-  // usage:
-  //   (void)fprintf(stderr, "Usage: %s -u -1 -m . -c /bin/sh ~\n", argv[0]);
-  // error:
-  //   err = 1;
-  // cleanup:
-  //   if (sockets[0]) {
-  //     close(sockets[0]);
-  //   }
-  //   if (sockets[1]) {
-  //     close(sockets[1]);
-  //   }
-  //   return err;
-  // exit(err);
 }

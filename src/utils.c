@@ -165,7 +165,7 @@ int userns(struct child_config* config) {
 
 // function 5: child function executed in new namespaces
 int child(void* arg) {
-  struct child_config* config = arg;
+  struct child_config* config = (struct child_config*)arg;
 
   if (sethostname(config->hostname, strlen(config->hostname)) ||
       mounts(config) || userns(config) || capabilities() || syscalls()) {
@@ -174,6 +174,13 @@ int child(void* arg) {
     return -1;
   }
 
-  close(config->fd);
+  if (close(config->fd)) {
+    perror("close failed: ");
+    return -1;
+  }
+  if (execve(config->argv[0], config->argv, NULL)) {
+    perror("execve failed!");
+    return -1;
+  }
   return 0;
 }
