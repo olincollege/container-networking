@@ -1,5 +1,5 @@
 #pragma once
-
+// NOLINTNEXTLINE
 #define _GNU_SOURCE
 
 #include <errno.h>
@@ -34,7 +34,7 @@
 
 void cleanup(int status, void* arg);
 
-void finish_child(int child_pid, int* err);
+void finish_child(int child_pid, unsigned int* err);
 
 void clear_resources(struct child_config* config, char* stack);
 

@@ -17,11 +17,11 @@ void cleanup(int status, void* arg) {
   (void)fprintf(stderr, "Cleanup function called with status: %d\n", status);
 }
 
-void finish_child(int child_pid, int* err) {
+void finish_child(int child_pid, unsigned int* err) {
   int child_status = 0;
   waitpid(child_pid, &child_status, 0);
   // free(child_pid);
-  *err |= WEXITSTATUS(child_status);
+  *err |= (unsigned int)WEXITSTATUS(child_status);
 }
 
 void clear_resources(struct child_config* config, char* stack) {
@@ -31,12 +31,13 @@ void clear_resources(struct child_config* config, char* stack) {
 
 void usage(char* path) {
   (void)fprintf(stderr, "Usage: %s -u -1 -m . -c /bin/sh ~\n", path);
+  // NOLINTNEXTLINE(concurrency-mt-unsafe)
   exit(EXIT_FAILURE);
 }
 
 int main(int argc, char** argv) {
   struct child_config config = {0};
-  int err = 0;
+  unsigned int err = 0;
   int option = 0;
   int sockets[2] = {0};
   pid_t child_pid = 0;
@@ -47,6 +48,7 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
+  // NOLINTNEXTLINE(concurrency-mt-unsafe)
   while ((option = getopt(argc, argv, "c:m:u:"))) {
     switch (option) {
       case 'c':
@@ -57,7 +59,10 @@ int main(int argc, char** argv) {
         config.mount_dir = optarg;
         break;
       case 'u':
-        if (sscanf(optarg, "%d", &config.uid) != 1) {
+      // manually checks error
+      // can also check uid mapping matches -u flag in terminal
+      // NOLINTNEXTLINE
+        if (sscanf(optarg, "%u", &config.uid) != 1) {
           (void)fprintf(stderr, "badly-formatted uid: %s\n", optarg);
           usage(argv[0]);
         }
@@ -81,9 +86,12 @@ finish_options:
   if (uname(&host)) {
     error_and_exit("failed: ");
   }
+
   int major = -1;
   int minor = -1;
-  if (sscanf(host.release, "%u.%u.", &major, &minor) != 2) {
+  //release format should follow specific convention - will print if there are issues
+  //NOLINTNEXTLINE
+  if (sscanf(host.release, "%d.%d.", &major, &minor) != 2) {
     (void)fprintf(stderr, "weird release format: %s\n", host.release);
     error_and_exit("weird release format");
   }
@@ -91,13 +99,13 @@ finish_options:
     (void)fprintf(stderr, "expected 4.7.x or 4.8.x: %s\n", host.release);
     error_and_exit("version mismatch");
   }
-  if (strcmp("x86_64", host.machine)) {
+  if (strcmp("x86_64", host.machine) != 0) {
     (void)fprintf(stderr, "expected x86_64: %s\n", host.machine);
     error_and_exit("architecture mismatch");
   }
   (void)fprintf(stderr, "%s on %s.\n", host.release, host.machine);
 
-  char hostname[256] = {0};
+  char hostname[PATH_MAX] = {0};
   if (choose_hostname(hostname, sizeof(hostname))) {
     error_and_exit("Choosing hostname failed");
   }
@@ -110,7 +118,6 @@ finish_options:
     error_and_exit("fcntl failed: ");
   }
   config.fd = sockets[1];
-#define STACK_SIZE (1024 * 1024)
 
   char* stack = 0;
   if (!(stack = malloc(STACK_SIZE))) {
@@ -118,14 +125,16 @@ finish_options:
   }
   if (resources(&config)) {
     clear_resources(&config, stack);
+    // NOLINTNEXTLINE(concurrency-mt-unsafe)
     exit(EXIT_FAILURE);
   }
   int flags = CLONE_NEWNS | CLONE_NEWCGROUP | CLONE_NEWPID | CLONE_NEWIPC |
-              CLONE_NEWNET | CLONE_NEWUTS;
+              CLONE_NEWNET | CLONE_NEWUTS | SIGCHLD;
   if ((child_pid =
-           clone(child, stack + STACK_SIZE, flags | SIGCHLD, &config)) == -1) {
+           clone(child, stack + STACK_SIZE, flags, &config)) == -1) {
     error_and_exit("=> clone failed!");
     clear_resources(&config, stack);
+    // NOLINTNEXTLINE(concurrency-mt-unsafe)
     exit(EXIT_FAILURE);
   }
   close(sockets[1]);
@@ -138,12 +147,14 @@ finish_options:
     }
     finish_child(child_pid, &err);
     clear_resources(&config, stack);
+    // NOLINTNEXTLINE(concurrency-mt-unsafe)
     exit(EXIT_FAILURE);
   }
 
   finish_child(child_pid, &err);
   clear_resources(&config, stack);
-  exit(err);
+  // NOLINTNEXTLINE(concurrency-mt-unsafe)
+  exit((int)err);
   // kill_and_finish_child:
   // if (child_pid) {
   //   kill(child_pid, SIGKILL);

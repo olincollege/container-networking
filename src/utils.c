@@ -90,7 +90,7 @@ int handle_child_uid_map(pid_t child_pid, int socket) {
     for (char** file = (char*[]){"uid_map", "gid_map", 0}; *file; file++) {
       //NOLINTNEXTLINE
       if (snprintf(path, sizeof(path), "/proc/%d/%s", child_pid, *file) >
-          sizeof(path)) {
+          (int)sizeof(path)) {
         perror("snprintf too big?");
         return -1;
       }
