@@ -46,3 +46,5 @@ find_library(CRITERION criterion REQUIRED)
 set(CRITERION_FLAGS --verbose -j1)
 
 add_subdirectory(test)
+
+
