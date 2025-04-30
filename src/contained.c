@@ -1,5 +1,6 @@
 /* Compile it with CMake!
- * sudo ./build/src/contained -u 1000 -m . -c /bin/sh ~ */
+ * sudo ./build/src/contained -u 0 -m ./alpine -c /bin/sh
+ */
 /* This code is licensed under the GPLv3. You can find its text here:
    https://www.gnu.org/licenses/gpl-3.0.en.html */
 
@@ -134,6 +135,7 @@ finish_options:
            clone(child, stack + STACK_SIZE, flags, (void*)&config)) == -1) {
     clear_resources(&config, stack);
     error_and_exit("=> clone failed!");
+    return EXIT_FAILURE;  // resolves warnings for some reason? extra explicit
   }
   close(sockets[1]);
   sockets[1] = 0;
