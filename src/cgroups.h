@@ -32,7 +32,7 @@ typedef struct cgrp_setting {
  * Create cgroup file directories with appropriate settings
  *
  * @param config The configuration/values this container will have
- * @return 0 on success, exits on failure.
+ * @return 0 on success, -1 on failure.
  */
 int resources(struct child_config* config);
 
@@ -40,7 +40,7 @@ int resources(struct child_config* config);
  * Safely delete the container made for the given child configuration
  *
  * @param config The configuration/values this container will have
- * @return 0 on success, exits on failure.
+ * @return 0 on success, -1 on failure.
  */
 int free_resources(struct child_config* config);
 
@@ -50,6 +50,6 @@ int free_resources(struct child_config* config);
  * 
  * @param config Pointer to a struct containing the path to the desired new 
  * root and other container info
- * @return 0 on success, exits on failure.
+ * @return 0 on success, -1 on failure.
  */
 int mounts(struct child_config* config);
