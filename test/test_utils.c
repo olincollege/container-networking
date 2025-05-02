@@ -1,38 +1,48 @@
+// Intentional name to enable GNU-specific features 
+// NOLINTNEXTLINE
+#define _GNU_SOURCE
 #include <criterion/criterion.h>
-#include <criterion/logging.h>
+#include <criterion/logging.h>  
 #include <criterion/new/assert.h>
-#include <criterion/redirect.h>
-#include <fcntl.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include <fcntl.h>               
+#include <string.h>              
+#include <sys/types.h>            
 #include <unistd.h>
 
 #include "../src/utils.h"
 
+enum { DEFAULT_TEST_UID = 1000 };
+enum { HOSTNAME_BUFFER_SIZE = 256 };
+
+
 // mocks -- might cause issues if compiled on a diff computer, I can fix it when
 // we try again, its a fix in cmake
 
+// Intentional names flagged for wrapping
+// NOLINTNEXTLINE
 int __wrap_open(const char* pathname, int flags, ...) {
   (void)pathname;
   (void)flags;
   return 3;
 }
 
-int __wrap_dprintf(int fd, const char* format, ...) {
-  (void)fd;
+// NOLINTNEXTLINE
+int __wrap_dprintf(int file_descriptor, const char* format, ...) {
+  (void)file_descriptor;
   (void)format;
   return 0;
 }
 
-ssize_t __wrap_write(int fd, const void* buf, size_t count) {
-  (void)fd;
+// NOLINTNEXTLINE
+ssize_t __wrap_write(int file_descriptor, const void* buf, size_t count) {
+  (void)file_descriptor;
   (void)buf;
   return (ssize_t)count;
 }
 
-ssize_t __wrap_read(int fd, void* buf, size_t count) {
-  (void)fd;
+// NOLINTNEXTLINE
+ssize_t __wrap_read(int file_descriptor, void* buf, size_t count) {
+  (void)file_descriptor;
   if (count >= sizeof(int)) {
     *(int*)buf = 0;
   }
@@ -42,7 +52,7 @@ ssize_t __wrap_read(int fd, void* buf, size_t count) {
 // Tests
 
 Test(utils, choose_hostname_format_and_length) {
-  char buffer[256];
+  char buffer[HOSTNAME_BUFFER_SIZE];
   int result = choose_hostname(buffer, sizeof(buffer));
 
   cr_assert_eq(result, 0, "choose_hostname should return 0");
@@ -52,7 +62,7 @@ Test(utils, choose_hostname_format_and_length) {
 
 Test(utils, handle_child_uid_map_success) {
   int pipefd[2];
-  cr_assert(pipe(pipefd) == 0, "pipe creation failed");
+  cr_assert(pipe2(pipefd, O_CLOEXEC) == 0, "pipe creation failed");
 
   int has_userns = 1;
   cr_assert(write(pipefd[1], &has_userns, sizeof(int)) == sizeof(int),
@@ -68,14 +78,16 @@ Test(utils, handle_child_uid_map_success) {
 
 Test(utils, userns_success) {
   int pipefd[2];
-  cr_assert(pipe(pipefd) == 0, "pipe creation failed");
+  cr_assert(pipe2(pipefd, O_CLOEXEC) == 0, "pipe creation failed");
 
-  struct child_config config = {.fd = pipefd[1],
-                                .uid = 1000,
-                                .argc = 0,
-                                .argv = NULL,
-                                .hostname = "unit-test",
-                                .mount_dir = NULL};
+  struct child_config config = {
+    .fd = pipefd[1],
+    .uid = DEFAULT_TEST_UID,
+    .argc = 0,
+    .argv = NULL,
+    .hostname = "unit-test",
+    .mount_dir = NULL
+  };
 
   int result = userns(&config);
   cr_assert_eq(result, 0, "userns should succeed");
