@@ -21,7 +21,6 @@ void cleanup(int status, void* arg) {
 void finish_child(int child_pid, unsigned int* err) {
   int child_status = 0;
   waitpid(child_pid, &child_status, 0);
-  // free(child_pid);
   *err |= (unsigned int)WEXITSTATUS(child_status);
 }
 

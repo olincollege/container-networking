@@ -22,16 +22,3 @@ target_link_libraries(namespaces PRIVATE cgroups syscalls)
 
 add_executable(contained contained.c)
 target_link_libraries(contained PRIVATE namespaces cgroups syscalls)
-
-# target_link
-# target_link_libraries(contained PRIVATE cap)
-
-# add_library(src
-# utils.c
-# )
-
-# target_include_directories(src
-# PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-# )
-# add_library(cgroups STATIC cgroups.c)
-# target_include_directories(cgroups PUBLIC)

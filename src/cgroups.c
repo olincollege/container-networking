@@ -39,7 +39,6 @@ int resources(struct child_config* config) {
     }
     (void)fprintf(stderr, "=> PID joining cgroup: %d\n", getpid()); // DEBUGGING
     // this puts the current process into this cgroup
-    // I think lizzie moves the process out of the cgroup at some point into her code (mounts), so we might want to do that
     dprintf(procs_fd, "%d", getpid());
     close(procs_fd);
 

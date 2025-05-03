@@ -24,7 +24,6 @@ int choose_hostname(char* buff, size_t len) {
     if (snprintf(buff, len, "%05lx-%s", now.tv_sec, major[card_index]) == -1) {
         error_and_exit("snprintf too big?");
     }
-    // snprintf(buff, len, "%05lx-%s", now.tv_sec, major[card_index]);
   } else {
     card_index -= sizeof(major) / sizeof(*major);
     // NOLINTNEXTLINE
@@ -44,7 +43,6 @@ int allocate_stack_and_clone(int sockets[2], struct child_config* config) {
   stack = malloc(STACK_SIZE);
   if (!stack) {
     error_and_exit("=> malloc failed, out of memory?");
-    // return -1;
   }
 
   if (resources(config)) {
@@ -52,15 +50,11 @@ int allocate_stack_and_clone(int sockets[2], struct child_config* config) {
     return -1;
   }
 
-  // int flags = CLONE_NEWNS | CLONE_NEWCGROUP | CLONE_NEWPID | CLONE_NEWIPC |
-  //             CLONE_NEWNET | CLONE_NEWUTS;
   int flags = CLONE_NEWNS | CLONE_NEWCGROUP | CLONE_NEWPID | CLONE_NEWIPC |
               CLONE_NEWNET | CLONE_NEWUTS | SIGCHLD;
 
-  // child_pid = clone(child, stack + STACK_SIZE, flags | SIGCHLD, (void*)config);
   child_pid = clone(child, stack + STACK_SIZE, flags, (void*)config);
   if (child_pid == -1) {
-    // (void)fprintf(stderr, "=> clone failed! %m\n");
     free(stack);
     perror("=> clone failed!");
     return -1;

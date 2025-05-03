@@ -4,10 +4,6 @@
 #include <criterion/criterion.h>
 #include <criterion/logging.h>  
 #include <criterion/new/assert.h>
-#include <fcntl.h>               
-#include <string.h>              
-#include <sys/types.h>            
-#include <unistd.h>
 
 #include "../src/namespaces.h"
 
@@ -15,8 +11,7 @@ enum { DEFAULT_TEST_UID = 1000 };
 enum { HOSTNAME_BUFFER_SIZE = 256 };
 
 
-// mocks -- might cause issues if compiled on a diff computer, I can fix it when
-// we try again, its a fix in cmake
+// mocks
 
 // Intentional names flagged for wrapping
 // NOLINTNEXTLINE
