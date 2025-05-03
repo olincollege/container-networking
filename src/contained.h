@@ -32,12 +32,42 @@
 #define MAJOR_VERSION 6
 #define MINOR_VERSION 8
 
+/**
+ * @brief 
+ * 
+ * @param status 
+ * @param arg 
+ */
 void cleanup(int status, void* arg);
 
+/**
+ * @brief 
+ * 
+ * @param child_pid 
+ * @param err 
+ */
 void finish_child(int child_pid, unsigned int* err);
 
+/**
+ * @brief 
+ * 
+ * @param config 
+ * @param stack 
+ */
 void clear_resources(struct child_config* config, char* stack);
 
+/**
+ * @brief 
+ * 
+ * @param path 
+ */
 void usage(char* path);
 
+/**
+ * @brief 
+ * 
+ * @param argc 
+ * @param argv 
+ * @return int 
+ */
 int main(int argc, char** argv);
