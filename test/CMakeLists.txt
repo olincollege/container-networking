@@ -25,16 +25,16 @@ add_test(
     COMMAND test_cgroups ${CRITERION_FLAGS}
 )
 
-add_executable(test_utils test_utils.c)
-target_link_libraries(test_utils
-    PRIVATE utils
+add_executable(test_namespaces test_namespaces.c)
+target_link_libraries(test_namespaces
+    PRIVATE namespaces
     PUBLIC ${CRITERION}
 )
-target_link_options(test_utils
+target_link_options(test_namespaces
     PRIVATE
     "-Wl,--wrap=open,--wrap=dprintf,--wrap=write,--wrap=read"
 )
 add_test(
-    NAME test_utils
-    COMMAND test_utils ${CRITERION_FLAGS}
+    NAME test_namespaces
+    COMMAND test_namespaces ${CRITERION_FLAGS}
 )

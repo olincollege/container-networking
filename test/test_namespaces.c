@@ -9,7 +9,7 @@
 #include <sys/types.h>            
 #include <unistd.h>
 
-#include "../src/utils.h"
+#include "../src/namespaces.h"
 
 enum { DEFAULT_TEST_UID = 1000 };
 enum { HOSTNAME_BUFFER_SIZE = 256 };
@@ -51,7 +51,7 @@ ssize_t __wrap_read(int file_descriptor, void* buf, size_t count) {
 
 // Tests
 
-Test(utils, choose_hostname_format_and_length) {
+Test(namespaces, choose_hostname_format_and_length) {
   char buffer[HOSTNAME_BUFFER_SIZE];
   int result = choose_hostname(buffer, sizeof(buffer));
 
@@ -60,7 +60,7 @@ Test(utils, choose_hostname_format_and_length) {
   cr_assert(strchr(buffer, '-') != NULL, "Hostname should have a dash");
 }
 
-Test(utils, handle_child_uid_map_success) {
+Test(namespaces, handle_child_uid_map_success) {
   int pipefd[2];
   cr_assert(pipe2(pipefd, O_CLOEXEC) == 0, "pipe creation failed");
 
@@ -76,7 +76,7 @@ Test(utils, handle_child_uid_map_success) {
   close(pipefd[1]);
 }
 
-Test(utils, userns_success) {
+Test(namespaces, userns_success) {
   int pipefd[2];
   cr_assert(pipe2(pipefd, O_CLOEXEC) == 0, "pipe creation failed");
 

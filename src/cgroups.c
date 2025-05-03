@@ -11,7 +11,7 @@ int resources(struct child_config* config) {
 
     (void)fprintf(stderr, "=> creating cgroup directory...\n");
     char dir[PATH_MAX] = {0};
-    // removing snprintf warnings - error checking is done manually with error_and_exit
+    // removing snprintf warnings - error checking is done manually with error handling
     // NOLINTNEXTLINE
     if (snprintf(dir, sizeof(dir), "/sys/fs/cgroup/%s", config->hostname) == -1) {
         perror("Failed to write cgroup directory name - too long?");

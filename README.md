@@ -2,7 +2,7 @@
 
 Container Networking is a class project for Software Systems (Spring 2025). In this project, we built minimal containers in C that support basic networking functionality. In the current configuration, we load an Alpine image (included in the repo—feel free to swap in others), run a setup bash script to configure networking permissions, and enable communication between the created containers.
 
-This repo contains the code to create two lightweight containers that can exchange messages using a simple echo function, based on assignment 08 and a [low-level container tutorial](https://blog.lizzie.io/linux-containers-in-500-loc.html#org65bbba4).
+This repo contains the code to create two light-weight containers that can exchange messages using a simple echo function, based on Software Systems Assignment 08 and a [low-level container tutorial](https://blog.lizzie.io/linux-containers-in-500-loc.html#org65bbba4).
 
 Our learning goals are to deepen our understanding of Linux containers, networking, and C systems programming, with a strong emphasis on documentation and testing.
 
@@ -40,13 +40,13 @@ container-networking/
 ├── src/                     # Core container code
 │   ├── cgroups.c/h          # Handles cgroup setup, configuration, and cleanup
 │   ├── contained.c/h        # Main logic for container lifecycle and setup
-│   ├── error_handling.c/h   # Simple error reporting (`error_and_exit`)
-│   ├── syscalls.c/h         # Wrappers for key system calls (mount, setuid)
-│   ├── utils.c/h            # Sets up namespaces
+│   ├── utils.c/h            # Simple error reporting and shared include statements
+│   ├── syscalls.c/h         # Wrappers for key system calls, removes some capabilities
+│   ├── namespaces.c/h       # Sets up namespaces
 │   └── CMakeLists.txt       # Build file for source
 ├── test/                    # Unit and integration tests
 │   ├── test_cgroups.c       # Tests for cgroup module
-│   ├── test_utils.c         # Tests for utility and namespace logic
+│   ├── test_namespaces.c    # Tests for namespace logic
 │   └── CMakeLists.txt       # Build file for tests
 ├── .clang-format            # Code style configuration
 ├── .clang-tidy              # Linting rules
@@ -61,7 +61,3 @@ container-networking/
 - @amgeorge22
 - @EarlJr53
 - @dakotacsk
-
-## License
-
-[MIT](https://choosealicense.com/licenses/mit/)

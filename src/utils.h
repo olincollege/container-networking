@@ -1,91 +1,61 @@
 // NOLINTNEXTLINE
-#define _GNU_SOURCE  // necessary for system level stuff
+#define _GNU_SOURCE
 #pragma once
+
+// Standard C headers
 #include <errno.h>
-#include <fcntl.h>
-#include <sched.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/wait.h>
 #include <time.h>
+
+// POSIX headers
+#include <fcntl.h>
+#include <grp.h>
+#include <libgen.h>
+#include <pwd.h>
+#include <sched.h>
+#include <sys/mount.h>
+#include <sys/prctl.h>
+#include <sys/resource.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
+#include <sys/types.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
-#include "cgroups.h"   // for resources()
-#include "syscalls.h"  // for syscalls() and capabilities()
-
-// might not need?
-#include <grp.h>
+// Linux-specific headers
 #include <linux/capability.h>
 #include <linux/limits.h>
-#include <pwd.h>
+
+// Third-party headers
 #include <seccomp.h>
+#include <sys/capability.h>
 
-#define STACK_SIZE ((size_t)(1024 * 1024))
-#define USERNS_OFFSET 10000
-#define USERNS_COUNT 2000
 
-/**
- * This function generates a pseudo-random container hostname by combining a
- * timestamp with a randomly selected name. This is not necessary but a fun
- * feature the original author wrote that we decided to keep.
- *
- * @param buff The buffer to store the generated host name.
- * @param len The length of the buffer.
- * @return 0 on success, -1 on failure.
- */
-int choose_hostname(char* buff, size_t len);
+struct child_config {
+  int argc;
+  uid_t uid;
+  int fd;
+  char* hostname;
+  char** argv;
+  char* mount_dir;
+};
 
 /**
- * This function sets up a new stack for the child process and uses `clone()`
- * with Linux namespace flags (PID, NET, IPC, MNT, CGROUP, UTS) to isolate the
- * container. The child process will later execute the `child()` function.
- * - PID namespace: Isolates process IDs.
- * - NET namespace: Isolates network stack.
- * - IPC namespace: Isolates inter-process communication.
- * - MNT namespace: Isolates filesystem mount points.
- * - CGROUP namespace: Isolates control groups.
- * - UTS namespace: Isolates hostname and domain name.
+ * Print an error message and exit the program.
  *
- * @param sockets The socket pair used for communication.
- * @param config The configuration for the child process.
- * @return 0 on success, -1 on failure.
- */
-int allocate_stack_and_clone(int sockets[2], struct child_config* config);
-
-/**
- * This function writes appropriate mappings to `/proc/[pid]/uid_map` and
- * `/proc/[pid]/gid_map` files so the containerized process can drop privileges
- * safely while appearing as root (uid 0) inside the container.
+ * This function wraps a call to `perror()` followed by `exit(EXIT_FAILURE)`.
+ * It is intended for use when a system call fails and the program cannot
+ * recover. The provided message is used as the prefix for the error output,
+ * followed by a description of the current `errno`. After printing the error
+ * message, the function will terminate the program immediately with a failure
+ * status. This function does not return.  It is useful for handling
+ * unrecoverable system call failures (e.g., `clone`, `mount`, `execve`) and
+ * also helps satisfy linting rules by avoiding duplicated logic.
  *
- * @param child_pid The PID of the child process.
- * @param socket The socket used for communication.
- * @return 0 on success, -1 on failure.
+ * @param error_msg The message to display before exiting.
  */
-int handle_child_uid_map(pid_t child_pid, int socket);
-
-/**
- * This function calls `unshare()` to create a new user namespace. It also
- * notifies the parent process to write UID/GID mappings and then switches to
- * the mapped user ID. This lets the container to operate with root-like
- * privileges inside the container while being unprivileged outside.
- *
- * @param config The configuration for the child process.
- * @return 0 on success, -1 on failure.
- */
-int userns(struct child_config* config);
-
-/**
- * This function runs inside the new namespaces and applies the container configuration:
- * - Sets hostname (UTS namespace)
- * - Mounts isolated filesystem (MNT namespace)
- * - Initializes user namespace (USER)
- * - Drops capabilities and installs seccomp filters
- * - Finally executes the target binary via `execve`
- *
- * @param arg Pointer to a child_config struct.
- * @return 0 on success, -1 on failure.
- */
-int child(void* arg);
+void error_and_exit(const char* error_msg);
