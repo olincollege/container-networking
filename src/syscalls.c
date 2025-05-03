@@ -58,8 +58,6 @@ int syscalls() {
       seccomp_rule_add(
           ctx, SCMP_FAIL, SCMP_SYS(clone), 1,
           SCMP_A0(SCMP_CMP_MASKED_EQ, CLONE_NEWUSER, CLONE_NEWUSER)) ||
-      seccomp_rule_add(ctx, SCMP_FAIL, SCMP_SYS(ioctl), 1,
-                       SCMP_A1(SCMP_CMP_MASKED_EQ, TIOCSTI, TIOCSTI)) ||
       seccomp_rule_add(ctx, SCMP_FAIL, SCMP_SYS(keyctl), 0) ||
       seccomp_rule_add(ctx, SCMP_FAIL, SCMP_SYS(add_key), 0) ||
       seccomp_rule_add(ctx, SCMP_FAIL, SCMP_SYS(request_key), 0) ||
