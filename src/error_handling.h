@@ -1,4 +1,4 @@
-//NOLINTNEXTLINE
+// NOLINTNEXTLINE
 #define _GNU_SOURCE
 
 #pragma once
@@ -26,7 +26,16 @@ struct child_config {
 };
 
 /**
- * Print error message and exit.
+ * Print an error message and exit the program.
+ *
+ * This function wraps a call to `perror()` followed by `exit(EXIT_FAILURE)`.
+ * It is intended for use when a system call fails and the program cannot
+ * recover. The provided message is used as the prefix for the error output,
+ * followed by a description of the current `errno`. After printing the error
+ * message, the function will terminate the program immediately with a failure
+ * status. This function does not return.  It is useful for handling
+ * unrecoverable system call failures (e.g., `clone`, `mount`, `execve`) and
+ * also helps satisfy linting rules by avoiding duplicated logic.
  *
  * @param error_msg The message to display before exiting.
  */
