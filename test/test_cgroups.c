@@ -6,6 +6,7 @@
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 
+// check that the files resources should create exist
 Test(cgroups, file_existence) {
     struct child_config test_config = {
         .argc = 0,
@@ -27,6 +28,7 @@ Test(cgroups, file_existence) {
     free_resources(&test_config);
 }
 
+// check that the files resources creates have the correct contents
 Test(cgroups, file_values) {
     struct child_config test_config = {
         .argc = 0,
@@ -54,6 +56,7 @@ Test(cgroups, file_values) {
     free_resources(&test_config);
 }
 
+// check that free resources removes the cgroup directory
 Test(cgroups, remove_cgroup_dir) {
     struct child_config test_config = {
         .argc = 0,
