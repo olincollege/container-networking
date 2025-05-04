@@ -105,7 +105,7 @@ int free_resources(struct child_config* config) {
     }
     close(root_fd);
 
-    // Now it's safe to remove the cgroup
+    // remove cgroup now that it's empty
     (void)fprintf(stderr, "=> remove cgroup directory...\n");
     if (rmdir(dir)) {
         perror("Failed to remove cgroup directory");
