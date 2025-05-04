@@ -136,6 +136,7 @@ finish_options:
     error_and_exit("=> clone failed!");
     return EXIT_FAILURE;  // resolves warnings for some reason? extra explicit
   }
+  (void)fprintf(stdout, "=> [container] PID: %d\n", child_pid);
   close(sockets[1]);
   sockets[1] = 0;
   close(sockets[1]);
