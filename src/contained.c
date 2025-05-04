@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
   pid_t child_pid = 0;
   int last_optind = 0;
 
+  // Register cleanup function to be called on exit
   if (on_exit(cleanup, (void*)sockets) != 0) {
     (void)fprintf(stderr, "Failed to register cleanup function\n");
     return EXIT_FAILURE;
@@ -51,14 +52,14 @@ int main(int argc, char** argv) {
   // NOLINTNEXTLINE(concurrency-mt-unsafe)
   while ((option = getopt(argc, argv, "c:m:u:"))) {
     switch (option) {
-      case 'c':
+      case 'c': // container command
         config.argc = argc - last_optind - 1;
         config.argv = &argv[argc - config.argc];
         goto finish_options;
-      case 'm':
+      case 'm': // mount directory
         config.mount_dir = optarg;
         break;
-      case 'u':
+      case 'u': // user id
       // manually checks error
       // can also check uid mapping matches -u flag in terminal
       // NOLINTNEXTLINE
@@ -74,10 +75,8 @@ int main(int argc, char** argv) {
   }
 
 finish_options:
-  if (!config.argc) {
-    usage(argv[0]);
-  }
-  if (!config.mount_dir) {
+  // Check for required arguments
+  if (!config.argc || !config.mount_dir) {
     usage(argv[0]);
   }
 
@@ -95,16 +94,21 @@ finish_options:
     (void)fprintf(stderr, "weird release format: %s\n", host.release);
     error_and_exit("weird release format");
   }
+
+  // Verify host version
   if (major != MAJOR_VERSION || minor != MINOR_VERSION) {
     (void)fprintf(stderr, "expected 4.7.x or 4.8.x: %s\n", host.release);
     error_and_exit("version mismatch");
   }
+
+  // Verify host architecture
   if (strcmp("x86_64", host.machine) != 0) {
     (void)fprintf(stderr, "expected x86_64: %s\n", host.machine);
     error_and_exit("architecture mismatch");
   }
   (void)fprintf(stderr, "%s on %s.\n", host.release, host.machine);
 
+  // Choose a random hostname
   char hostname[PATH_MAX] = {0};
   if (choose_hostname(hostname, sizeof(hostname))) {
     error_and_exit("Choosing hostname failed");
@@ -130,17 +134,23 @@ finish_options:
   }
   int flags = CLONE_NEWNS | CLONE_NEWCGROUP | CLONE_NEWPID | CLONE_NEWIPC |
               CLONE_NEWNET | CLONE_NEWUTS | SIGCHLD;
+
+  // Create the container in a child process
   if ((child_pid =
            clone(child, stack + STACK_SIZE, flags, (void*)&config)) == -1) {
     clear_resources(&config, stack);
     error_and_exit("=> clone failed!");
     return EXIT_FAILURE;  // resolves warnings for some reason? extra explicit
   }
+
+  // Print the child PID
   (void)fprintf(stdout, "=> [container] PID: %d\n", child_pid);
   close(sockets[1]);
   sockets[1] = 0;
   close(sockets[1]);
   sockets[1] = 0;
+
+  // Map the child UID and GID
   if (handle_child_uid_map(child_pid, sockets[0])) {
     if (child_pid) {
       kill(child_pid, SIGKILL);
@@ -151,6 +161,7 @@ finish_options:
     exit(EXIT_FAILURE);
   }
 
+  // Finish and clean up
   finish_child(child_pid, &err);
   clear_resources(&config, stack);
   // NOLINTNEXTLINE(concurrency-mt-unsafe)
