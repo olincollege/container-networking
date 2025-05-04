@@ -6,7 +6,6 @@ This repo contains the code to create two light-weight containers that can excha
 
 Our learning goals are to deepen our understanding of Linux containers, networking, and C systems programming, with a strong emphasis on documentation and testing.
 
-
 ## Installation
 
 1. **Clone the repo**
@@ -17,6 +16,7 @@ Our learning goals are to deepen our understanding of Linux containers, networki
    ```
 
 2. **Build the project**
+
    We use CMake for building:
 
    ```bash
@@ -26,10 +26,86 @@ Our learning goals are to deepen our understanding of Linux containers, networki
    make
    ```
 
+3. **Build the scripts in Alpine**
+
+   Our containers run Alpine Linux. To run the `run_server` and `run_client` scripts in the Alpine image, we need to build them in the Alpine environment. To do so, we use a Docker container.
+
+   ```bash
+   cd <project_root>
+   docker run -it -v ./alpine/home:/home/ alpine
+   ```
+
+   This command mounts the `alpine/home` directory from your host machine to the `/home` directory in the Docker container. Once in the Docker container, you can run the following commands to build:
+
+   ```bash
+   apk add build-base cmake
+   cd /home
+   mkdir build
+   cd build
+   cmake ..
+   make
+   ```
+
+   From here, you can exit out of the Docker container and the executables will be available in our custom containers.
+
 ## Usage
 
-TODO
+1. **Start both containers**
 
+   To start the containers, run the following command in two separate terminal windows:
+
+   ```bash
+   sudo ./build/src/contained -u 0 -m ./alpine/ -c /bin/sh
+   ```
+
+   As part of the command, we specify the user ID (`-u 0`, or the root user), the path to the Alpine image (`-m ./alpine/`), and the command to run in the container (`-c /bin/sh`). This will start a shell in the container.
+
+   One of the output lines will look like this:
+
+   ```bash
+   => [container] PID: 1032630
+   ```
+
+   Where `1032630` is the PID of the container. You will need this PID from both containers to set up the network.
+
+2. **Run the network setup script**
+
+   In a third terminal window, run the following command to set up the network:
+
+   ```bash
+   sudo bash ./setup.sh <SERVER_PID> <CLIENT_PID>
+   ```
+
+   Replace `<SERVER_PID>` and `<CLIENT_PID>` with the PIDs of the server and client containers, respectively. This will set up the network namespaces and create a virtual Ethernet interface for communication between the two containers.
+
+3. **Run the server and client**
+
+   In the first terminal window (the server), run the following command to start the server:
+
+   ```bash
+   /home/build/src/run_server
+   ```
+
+   In the second terminal window (the client), run the following command to start the client:
+
+   ```bash
+   /home/build/src/run_client
+   ```
+
+4. **Experiment with the echo functionality**
+
+   In the client terminal, you can now send messages to the server and receive responses. Any words you type in the client terminal will be sent to the server, and the server will echo them back.
+
+## Testing
+
+We have included unit tests for the cgroup and namespace modules. To run the tests, you can use the following commands:
+
+```bash
+cd build
+sudo ctest
+```
+
+This will run all the tests in the `test` directory. You can also run individual tests by specifying the test name.
 
 ## Repo Structure
 
@@ -58,6 +134,7 @@ container-networking/
 ```
 
 ## Authors
+
 - @amgeorge22
 - @EarlJr53
 - @dakotacsk
