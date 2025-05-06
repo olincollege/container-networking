@@ -112,6 +112,7 @@ This will run all the tests in the `test` directory. You can also run individual
 ```{bash}
 container-networking/
 ├── alpine/                  # Alpine-related files or image config
+│   └── home/src/            # Code for server/client
 ├── research/                # Research notes, background materials
 ├── src/                     # Core container code
 │   ├── cgroups.c/h          # Handles cgroup setup, configuration, and cleanup
