@@ -6,6 +6,13 @@ This repo contains the code to create two light-weight containers that can excha
 
 Our learning goals are to deepen our understanding of Linux containers, networking, and C systems programming, with a strong emphasis on documentation and testing.
 
+## Requirements
+
+- Follow these instructions to install docker. This is needed to initially build the client and server code, as our container does not have a compiler. 
+   - https://docs.docker.com/engine/install/ubuntu/
+- Run the following command to install the packages necessary to run a bridge network.
+   - `sudo apt install bridge-utils`
+
 ## Installation
 
 1. **Clone the repo**
